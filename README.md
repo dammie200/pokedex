@@ -5,7 +5,7 @@ Een eenvoudige webapplicatie om een Living Dex bij te houden voor meerdere Poké
 ## Functies
 
 - Kies het spel waarvoor je de voortgang wilt zien.
-- Wissel tussen de nationale Pokédex, regionale varianten en de nieuwe "Other Available Pokémon"-lijsten per spel (zoals Paldea, Kitakami, Blueberry, Galar, Isle of Armor en Crown Tundra).
+- Wissel tussen regionale Pokédexen, "Other Available Pokémon"-lijsten en nieuwe categorieën zoals "Alternate Forms" en "All Pokémon" per spel (bijv. Paldea, Kitakami, Blueberry, Galar, Isle of Armor en Crown Tundra). Alleen Brilliant Diamond & Shining Pearl behouden voorlopig een Nationale Pokédex.
 - Bekijk een raster in de stijl van een Pokémon box met sprites en namen.
 - Markeer welke Pokémon je hebt gevangen. De voortgang wordt lokaal opgeslagen in de browser.
 - Zoek binnen de geselecteerde Living Dex.
@@ -35,9 +35,11 @@ komt.
 
 ### Handige velden in `GAME_CONFIG`
 
-- `speciesOverrides` (per Pokédex): hiermee kun je basissoorten vervangen door een regionale variant (bijv. Galarian Meowth). Gebruik de `form`-sleutel met een bekende vormcode (zoals `galar`, `hisui`, `paldea-combat`).
+- `speciesOverrides` (per Pokédex): hiermee kun je basissoorten vervangen door een regionale variant (bijv. Galarian Meowth). Gebruik de `form`-sleutel met een bekende vormcode (zoals `galar`, `hisui`, `paldea-combat`) of zet `variantRegionCode` op `A`, `G`, `H`, `P`, … om automatisch de juiste vorm, sprite en vangstsleutel te kiezen.
 - `entryOverrides`: overschrijft individuele dex-entry's (nummer, naam of sprite) op basis van het Pokédex-volgnummer.
-- `manualEntries`: voeg extra entries toe aan een regionale dex (bijv. extra Paldean Tauros-vormen) met een eigen volgnummer en eventuele vorm.
+- `manualEntries`: voeg extra entries toe aan een regionale dex met een eigen volgnummer en eventuele vorm. Gebruik optioneel `referenceDexNumber` om de soort van een bestaande Pokédex-entry te hergebruiken of `variantRegionCode` voor automatische variant-keuze.
+- `type: "aggregate"` combineert meerdere eerder gedefinieerde dexen in één lijst (zoals "All Pokémon"). Dubbele soorten worden automatisch gefilterd op basis van hun vangstsleutel.
+- `type: "regional-variants"` genereert automatisch een lijst met alle bekende regionale vormen (handig voor Pokémon HOME).
 - `type: "other-available"`-dexen stellen automatisch een lijst samen op basis van PokéAPI `version-group` data en sluiten eerder gedefinieerde dexen uit. Gebruik `versionGroups` om de relevante versies te benoemen, `excludeDexIds` om overlappende dexen weg te filteren, en `ensureSpecies`, `speciesOverrides` of `manualEntries` voor eventuele event- of vormspecifieke aanvullingen.
 - `type: "manual"` blijft beschikbaar voor volledig handmatige lijsten (bijv. wanneer er geen betrouwbare bron bestaat).
 

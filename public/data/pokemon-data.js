@@ -165,7 +165,6 @@ const GAME_CONFIG = [
     id: "scarlet-violet",
     name: "Scarlet & Violet",
     dexes: [
-      { id: "national", name: "National Pokédex", source: { type: "all" } },
       {
         id: "paldea",
         name: "Paldea Pokédex",
@@ -176,24 +175,9 @@ const GAME_CONFIG = [
             128: { form: "paldea-combat" },
             194: { form: "paldea" },
           },
-          manualEntries: [
-            {
-              speciesId: 128,
-              form: "paldea-blaze",
-              dexNumber: 217,
-              displayDexNumber: "217*P",
-              name: "Tauros (Paldean Blaze)",
-              sortIndex: 217.1,
-            },
-            {
-              speciesId: 128,
-              form: "paldea-aqua",
-              dexNumber: 218,
-              displayDexNumber: "218*P",
-              name: "Tauros (Paldean Aqua)",
-              sortIndex: 218.1,
-            },
-          ],
+          entryOverrides: {
+            223: { variantRegionCode: "P" },
+          },
         },
       },
       {
@@ -204,19 +188,119 @@ const GAME_CONFIG = [
       {
         id: "blueberry",
         name: "Blueberry Pokédex",
-        source: { type: "pokedex", slugs: ["blueberry", "blueberry-academy", "indigo-disk"] },
+        source: {
+          type: "pokedex",
+          slugs: ["blueberry", "blueberry-academy", "indigo-disk"],
+          entryOverrides: {
+            4: { displayDexNumber: "004" },
+            66: { variantRegionCode: "A" },
+            67: { variantRegionCode: "A" },
+            68: { variantRegionCode: "A" },
+            69: { displayDexNumber: "069*" },
+            75: { variantRegionCode: "G" },
+            76: { variantRegionCode: "G" },
+            77: { variantRegionCode: "G" },
+            96: { variantRegionCode: "A" },
+            97: { variantRegionCode: "A" },
+            98: { variantRegionCode: "A" },
+            146: { variantRegionCode: "H" },
+            155: { variantRegionCode: "A" },
+            156: { variantRegionCode: "A" },
+            157: { variantRegionCode: "A" },
+            158: { displayDexNumber: "158*" },
+          },
+          manualEntries: [
+            {
+              referenceDexNumber: 4,
+              variantRegionCode: "A",
+              displayDexNumber: "004*A",
+              sortIndex: 4.1,
+            },
+          ],
+        },
       },
       {
         id: "scarlet-violet-other",
         name: "Other Available Pokémon",
         source: {
-          type: "other-available",
-          versionGroups: ["scarlet-violet"],
-          excludeDexIds: ["paldea", "kitakami", "blueberry"],
-          ensureSpecies: [150, 151, 901, 1009, 1010, 1024, 1025],
-          speciesOverrides: {
-            901: { form: "bloodmoon" },
-          },
+          type: "manual",
+          entries: [
+            { speciesId: 144 },
+            { speciesId: 145 },
+            { speciesId: 146 },
+            { speciesId: 243 },
+            { speciesId: 244 },
+            { speciesId: 245 },
+            { speciesId: 249 },
+            { speciesId: 250 },
+            { speciesId: 380 },
+            { speciesId: 381 },
+            { speciesId: 382 },
+            { speciesId: 383 },
+            { speciesId: 384 },
+            { speciesId: 638 },
+            { speciesId: 639 },
+            { speciesId: 640 },
+            { speciesId: 643 },
+            { speciesId: 644 },
+            { speciesId: 646 },
+            { speciesId: 648 },
+            { speciesId: 791 },
+            { speciesId: 792 },
+            { speciesId: 800 },
+            { speciesId: 891 },
+            { speciesId: 892 },
+            { speciesId: 896 },
+            { speciesId: 897 },
+          ],
+        },
+      },
+      {
+        id: "scarlet-violet-alternate",
+        name: "Alternate Forms",
+        source: {
+          type: "manual",
+          entries: [
+            { speciesId: 128, form: "paldea-blaze" },
+            { speciesId: 128, form: "paldea-aqua" },
+            { speciesId: 26, variantRegionCode: "A" },
+            { speciesId: 52, variantRegionCode: "A" },
+            { speciesId: 52, variantRegionCode: "G" },
+            { speciesId: 53, variantRegionCode: "A" },
+            { speciesId: 863 },
+            { speciesId: 58, variantRegionCode: "H" },
+            { speciesId: 59, variantRegionCode: "H" },
+            { speciesId: 100, variantRegionCode: "H" },
+            { speciesId: 101, variantRegionCode: "H" },
+            { speciesId: 110, variantRegionCode: "G" },
+            { speciesId: 144, variantRegionCode: "G" },
+            { speciesId: 145, variantRegionCode: "G" },
+            { speciesId: 146, variantRegionCode: "G" },
+            { speciesId: 157, variantRegionCode: "H" },
+            { speciesId: 503, variantRegionCode: "H" },
+            { speciesId: 549, variantRegionCode: "H" },
+            { speciesId: 570, variantRegionCode: "H" },
+            { speciesId: 571, variantRegionCode: "H" },
+            { speciesId: 628, variantRegionCode: "H" },
+            { speciesId: 705, variantRegionCode: "H" },
+            { speciesId: 706, variantRegionCode: "H" },
+            { speciesId: 713, variantRegionCode: "H" },
+            { speciesId: 724, variantRegionCode: "H" },
+          ],
+        },
+      },
+      {
+        id: "scarlet-violet-all",
+        name: "All Pokémon",
+        source: {
+          type: "aggregate",
+          dexIds: [
+            "paldea",
+            "kitakami",
+            "blueberry",
+            "scarlet-violet-other",
+            "scarlet-violet-alternate",
+          ],
         },
       },
     ],
@@ -225,7 +309,6 @@ const GAME_CONFIG = [
     id: "legends-arceus",
     name: "Legends Arceus",
     dexes: [
-      { id: "national", name: "National Pokédex", source: { type: "all" } },
       {
         id: "hisui",
         name: "Hisui Pokédex",
@@ -252,23 +335,12 @@ const GAME_CONFIG = [
           },
         },
       },
-      {
-        id: "legends-arceus-other",
-        name: "Other Available Pokémon",
-        source: {
-          type: "other-available",
-          versionGroups: ["legends-arceus"],
-          excludeDexIds: ["hisui"],
-          ensureSpecies: [489, 490, 491, 492, 493],
-        },
-      },
     ],
   },
   {
     id: "sword-shield",
     name: "Sword & Shield",
     dexes: [
-      { id: "national", name: "National Pokédex", source: { type: "all" } },
       {
         id: "galar",
         name: "Galar Pokédex",
@@ -311,6 +383,11 @@ const GAME_CONFIG = [
             264: { form: "galar" },
             618: { form: "galar" },
           },
+          entryOverrides: {
+            1: { variantRegionCode: "G" },
+            2: { variantRegionCode: "G" },
+            3: { variantRegionCode: "G" },
+          },
         },
       },
       {
@@ -330,10 +407,118 @@ const GAME_CONFIG = [
         id: "sword-shield-other",
         name: "Other Available Pokémon",
         source: {
-          type: "other-available",
-          versionGroups: ["sword-shield"],
-          excludeDexIds: ["galar", "isle-of-armor", "crown-tundra"],
-          ensureSpecies: [150, 151, 893],
+          type: "manual",
+          entries: [
+            { speciesId: 150 },
+            { speciesId: 243 },
+            { speciesId: 244 },
+            { speciesId: 245 },
+            { speciesId: 249 },
+            { speciesId: 250 },
+            { speciesId: 252 },
+            { speciesId: 253 },
+            { speciesId: 254 },
+            { speciesId: 255 },
+            { speciesId: 256 },
+            { speciesId: 257 },
+            { speciesId: 258 },
+            { speciesId: 259 },
+            { speciesId: 260 },
+            { speciesId: 380 },
+            { speciesId: 381 },
+            { speciesId: 382 },
+            { speciesId: 383 },
+            { speciesId: 384 },
+            { speciesId: 480 },
+            { speciesId: 481 },
+            { speciesId: 482 },
+            { speciesId: 483 },
+            { speciesId: 484 },
+            { speciesId: 485 },
+            { speciesId: 486 },
+            { speciesId: 487 },
+            { speciesId: 488 },
+            { speciesId: 641 },
+            { speciesId: 642 },
+            { speciesId: 643 },
+            { speciesId: 644 },
+            { speciesId: 645 },
+            { speciesId: 646 },
+            { speciesId: 647 },
+            { speciesId: 716 },
+            { speciesId: 717 },
+            { speciesId: 718 },
+            { speciesId: 722 },
+            { speciesId: 723 },
+            { speciesId: 724 },
+            { speciesId: 725 },
+            { speciesId: 726 },
+            { speciesId: 727 },
+            { speciesId: 728 },
+            { speciesId: 729 },
+            { speciesId: 730 },
+            { speciesId: 785 },
+            { speciesId: 786 },
+            { speciesId: 787 },
+            { speciesId: 788 },
+            { speciesId: 789 },
+            { speciesId: 790 },
+            { speciesId: 791 },
+            { speciesId: 792 },
+            { speciesId: 793 },
+            { speciesId: 794 },
+            { speciesId: 795 },
+            { speciesId: 796 },
+            { speciesId: 797 },
+            { speciesId: 798 },
+            { speciesId: 799 },
+            { speciesId: 800 },
+            { speciesId: 803 },
+            { speciesId: 804 },
+            { speciesId: 805 },
+            { speciesId: 806 },
+          ],
+        },
+      },
+      {
+        id: "sword-shield-alternate",
+        name: "Alternate Forms",
+        source: {
+          type: "manual",
+          entries: [
+            { speciesId: 52, variantRegionCode: "G" },
+            { speciesId: 77, variantRegionCode: "G" },
+            { speciesId: 78, variantRegionCode: "G" },
+            { speciesId: 79, variantRegionCode: "G" },
+            { speciesId: 80, variantRegionCode: "G" },
+            { speciesId: 83, variantRegionCode: "G" },
+            { speciesId: 110, variantRegionCode: "G" },
+            { speciesId: 122, variantRegionCode: "G" },
+            { speciesId: 144, variantRegionCode: "G" },
+            { speciesId: 145, variantRegionCode: "G" },
+            { speciesId: 146, variantRegionCode: "G" },
+            { speciesId: 222, variantRegionCode: "G" },
+            { speciesId: 263, variantRegionCode: "G" },
+            { speciesId: 264, variantRegionCode: "G" },
+            { speciesId: 554, variantRegionCode: "G" },
+            { speciesId: 555, form: "galar-standard" },
+            { speciesId: 562, variantRegionCode: "G" },
+            { speciesId: 618, variantRegionCode: "G" },
+          ],
+        },
+      },
+      {
+        id: "sword-shield-all",
+        name: "All Pokémon",
+        source: {
+          type: "aggregate",
+          dexIds: [
+            "galar",
+            "isle-of-armor",
+            "crown-tundra",
+            "sword-shield-other",
+            "sword-shield-alternate",
+          ],
         },
       },
     ],
@@ -369,12 +554,9 @@ const GAME_CONFIG = [
     dexes: [
       { id: "home", name: "HOME Pokédex", source: { type: "all" } },
       {
-        id: "home-other",
-        name: "Other Available Pokémon",
-        source: {
-          type: "manual",
-          entries: [],
-        },
+        id: "home-alternate",
+        name: "Alternate Forms",
+        source: { type: "regional-variants" },
       },
     ],
   },
@@ -498,7 +680,12 @@ function buildDexEntry(options, speciesById) {
     key,
     speciesId,
     dexNumber: dexNumberValue,
-    sortIndex: sortIndex ?? (typeof dexNumber === "number" ? dexNumber : null),
+    form,
+    sortIndex:
+      sortIndex ??
+      (typeof dexNumberValue === "number" && Number.isFinite(dexNumberValue)
+        ? dexNumberValue
+        : null),
     nationalDexNumber: speciesId,
     name: nameOverride || variant?.name || species.name,
     sprite,
@@ -577,6 +764,88 @@ async function fetchVersionGroupSpecies(slugs = []) {
   return Array.from(speciesSet.keys());
 }
 
+function normalizeRegionCode(code) {
+  if (!code && code !== 0) return null;
+  return String(code).trim().toUpperCase() || null;
+}
+
+function findVariantByRegion(speciesId, regionCode) {
+  const normalized = normalizeRegionCode(regionCode);
+  if (!normalized) return null;
+  return (
+    REGIONAL_VARIANTS.find(
+      (variant) =>
+        variant.speciesId === speciesId &&
+        normalizeRegionCode(variant.regionCode) === normalized
+    ) || null
+  );
+}
+
+function applyVariantRegion(speciesId, override = {}) {
+  if (!override) return {};
+  const result = { ...override };
+  const variantRegion =
+    result.variantRegionCode || result.variantRegion || null;
+  if (variantRegion) {
+    const variant = findVariantByRegion(speciesId, variantRegion);
+    if (variant) {
+      if (!result.form) {
+        result.form = variant.form;
+      }
+      if (!result.regionCodeOverride && !result.regionCode) {
+        result.regionCodeOverride = variant.regionCode;
+      }
+      if (!result.nameOverride && !result.name) {
+        result.nameOverride = variant.name;
+      }
+      if (!result.spriteOverride && !result.sprite && variant.sprite) {
+        result.spriteOverride = variant.sprite;
+      }
+      if (!result.spriteSlugOverride && !result.spriteSlug && variant.formSlug) {
+        result.spriteSlugOverride = variant.formSlug;
+      }
+      if (!result.catchKeyOverride && !result.catchKey) {
+        result.catchKeyOverride = variant.key;
+      }
+    }
+    delete result.variantRegionCode;
+    delete result.variantRegion;
+  }
+  return result;
+}
+
+function createEntryDefinition(speciesId, override = {}, fallbackDexNumber = null) {
+  const resolved = applyVariantRegion(speciesId, override);
+  const dexNumber =
+    resolved.dexNumber ?? resolved.entryNumber ?? fallbackDexNumber ?? null;
+  const nameOverride = resolved.nameOverride ?? resolved.name ?? null;
+  const spriteOverride = resolved.spriteOverride ?? resolved.sprite ?? null;
+  const spriteSlugOverride =
+    resolved.spriteSlugOverride ?? resolved.spriteSlug ?? null;
+  const regionCodeOverride =
+    resolved.regionCodeOverride ?? resolved.regionCode ?? null;
+  const catchKeyOverride =
+    resolved.catchKeyOverride ?? resolved.catchKey ?? null;
+  const sortIndex =
+    resolved.sortIndex ??
+    (typeof dexNumber === "number" && Number.isFinite(dexNumber)
+      ? dexNumber
+      : fallbackDexNumber);
+
+  return {
+    speciesId,
+    dexNumber,
+    displayDexNumber: resolved.displayDexNumber ?? null,
+    form: resolved.form ?? null,
+    nameOverride,
+    spriteOverride,
+    spriteSlugOverride,
+    regionCodeOverride,
+    catchKeyOverride,
+    sortIndex,
+  };
+}
+
 function mergeOverrides(baseOverride = {}, specificOverride = {}) {
   return { ...baseOverride, ...specificOverride };
 }
@@ -623,47 +892,50 @@ async function createDexEntries(source, speciesById, allSpecies, context = {}) {
           return null;
         }
         const override = mergeOverrides(speciesOverride, entryOverride);
-        return buildDexEntry(
-          {
-            speciesId,
-            dexNumber: override.dexNumber ?? entryNumber,
-            form: override.form,
-            displayDexNumber: override.displayDexNumber,
-            nameOverride: override.name,
-            spriteOverride: override.sprite,
-            spriteSlugOverride: override.spriteSlug,
-            regionCodeOverride: override.regionCode,
-            catchKeyOverride: override.catchKey,
-            sortIndex: override.sortIndex ?? entryNumber,
-          },
-          speciesById
+        const definition = createEntryDefinition(
+          speciesId,
+          { ...override, dexNumber: override.dexNumber ?? entryNumber },
+          entryNumber
         );
+        return buildDexEntry(definition, speciesById);
       })
       .filter(Boolean);
 
     if (Array.isArray(source.manualEntries) && source.manualEntries.length) {
       const manual = source.manualEntries
-        .map((entry, index) =>
-          buildDexEntry(
-            {
-              speciesId: entry.speciesId ?? entry.id,
-              dexNumber: entry.dexNumber ?? entry.entryNumber ?? index + 1,
-              displayDexNumber: entry.displayDexNumber,
-              form: entry.form,
-              nameOverride: entry.name,
-              spriteOverride: entry.sprite,
-              spriteSlugOverride: entry.spriteSlug,
-              regionCodeOverride: entry.regionCode,
-              catchKeyOverride: entry.catchKey,
-              sortIndex:
-                entry.sortIndex ??
-                entry.dexNumber ??
-                entry.entryNumber ??
-                (entries.length + index + 1),
-            },
-            speciesById
-          )
-        )
+        .map((entry, index) => {
+          if (!entry) return null;
+          let speciesId = entry.speciesId ?? entry.id ?? null;
+          if (!speciesId && entry.referenceDexNumber !== undefined) {
+            const reference = entries.find(
+              (baseEntry) => baseEntry.entryNumber === entry.referenceDexNumber
+            );
+            if (reference) {
+              speciesId = reference.speciesId;
+            }
+          }
+          if (!speciesId) {
+            console.warn(
+              "Handmatige Pokédex-entry mist een geldige speciesId en wordt overgeslagen."
+            );
+            return null;
+          }
+
+          const fallbackNumber =
+            entry.dexNumber ??
+            entry.entryNumber ??
+            entry.referenceDexNumber ??
+            entries.length + index + 1;
+          const override = { ...entry, dexNumber: fallbackNumber };
+          delete override.referenceDexNumber;
+          delete override.id;
+          const definition = createEntryDefinition(
+            speciesId,
+            override,
+            fallbackNumber
+          );
+          return buildDexEntry(definition, speciesById);
+        })
         .filter(Boolean);
       results.push(...manual);
     }
@@ -671,26 +943,116 @@ async function createDexEntries(source, speciesById, allSpecies, context = {}) {
     return sortDexEntries(results);
   }
 
+  if (source.type === "aggregate") {
+    const existingDexEntries = context.existingDexEntries || new Map();
+    const includeDexIds = Array.isArray(source.dexIds) && source.dexIds.length
+      ? source.dexIds
+      : Array.from(existingDexEntries.keys());
+    const seenKeys = new Set();
+    const aggregated = [];
+
+    includeDexIds.forEach((dexId) => {
+      const entries = existingDexEntries.get(dexId) || [];
+      entries.forEach((entry) => {
+        if (!entry) return;
+        const key = entry.key || `${entry.speciesId}:${entry.form ?? ""}`;
+        if (seenKeys.has(key)) return;
+        seenKeys.add(key);
+        aggregated.push(entry);
+      });
+    });
+
+    aggregated.sort((a, b) => {
+      const aIndex = a.sortIndex ??
+        (typeof a.dexNumber === "number" && Number.isFinite(a.dexNumber)
+          ? a.dexNumber
+          : Number.MAX_SAFE_INTEGER);
+      const bIndex = b.sortIndex ??
+        (typeof b.dexNumber === "number" && Number.isFinite(b.dexNumber)
+          ? b.dexNumber
+          : Number.MAX_SAFE_INTEGER);
+      if (aIndex !== bIndex) {
+        return aIndex - bIndex;
+      }
+      return a.name.localeCompare(b.name, "en", { sensitivity: "base" });
+    });
+
+    return aggregated
+      .map((entry, index) => {
+        const form =
+          entry.form ??
+          (entry.key && entry.key.includes(":")
+            ? entry.key.split(":").slice(1).join(":")
+            : null);
+        const definition = createEntryDefinition(
+          entry.speciesId,
+          {
+            form,
+            nameOverride: entry.name,
+            spriteOverride: entry.sprite,
+            regionCodeOverride: entry.regionCode,
+            catchKeyOverride: entry.key,
+            dexNumber: index + 1,
+            sortIndex: index + 1,
+          },
+          index + 1
+        );
+        return buildDexEntry(definition, speciesById);
+      })
+      .filter(Boolean);
+  }
+
+  if (source.type === "regional-variants") {
+    const variants = [...REGIONAL_VARIANTS].sort((a, b) => {
+      if (a.speciesId !== b.speciesId) {
+        return a.speciesId - b.speciesId;
+      }
+      return a.form.localeCompare(b.form);
+    });
+
+    return variants
+      .map((variant, index) => {
+        const definition = createEntryDefinition(
+          variant.speciesId,
+          {
+            form: variant.form,
+            nameOverride: variant.name,
+            spriteOverride: variant.sprite,
+            spriteSlugOverride: variant.formSlug,
+            regionCodeOverride: variant.regionCode,
+            catchKeyOverride: variant.key,
+            dexNumber: index + 1,
+            sortIndex: index + 1,
+          },
+          index + 1
+        );
+        return buildDexEntry(definition, speciesById);
+      })
+      .filter(Boolean);
+  }
+
   if (source.type === "manual") {
     const entries = source.entries || [];
     return sortDexEntries(
       entries
         .map((entry, index) =>
-          buildDexEntry(
-            {
-              speciesId: entry.speciesId ?? entry.id,
-              dexNumber: entry.dexNumber ?? index + 1,
-              displayDexNumber: entry.displayDexNumber,
-              form: entry.form,
-              nameOverride: entry.name,
-              spriteOverride: entry.sprite,
-              spriteSlugOverride: entry.spriteSlug,
-              regionCodeOverride: entry.regionCode,
-              catchKeyOverride: entry.catchKey,
-              sortIndex: entry.sortIndex ?? (entry.dexNumber ?? index + 1),
-            },
-            speciesById
-          )
+          {
+            if (!entry) return null;
+            const speciesId = entry.speciesId ?? entry.id ?? null;
+            if (!speciesId) {
+              console.warn("Handmatige lijst-entry mist speciesId en wordt overgeslagen.");
+              return null;
+            }
+            const fallbackNumber = entry.dexNumber ?? index + 1;
+            const override = { ...entry, dexNumber: fallbackNumber };
+            delete override.id;
+            const definition = createEntryDefinition(
+              speciesId,
+              override,
+              fallbackNumber
+            );
+            return buildDexEntry(definition, speciesById);
+          }
         )
         .filter(Boolean)
     );
@@ -777,18 +1139,12 @@ async function createDexEntries(source, speciesById, allSpecies, context = {}) {
 
       autoIndex += 1;
       const dexNumber = speciesOverride.dexNumber ?? autoIndex;
-      definitions.push({
+      const definition = createEntryDefinition(
         speciesId,
-        form,
-        dexNumber,
-        displayDexNumber: speciesOverride.displayDexNumber,
-        nameOverride: speciesOverride.name,
-        spriteOverride: speciesOverride.sprite,
-        spriteSlugOverride: speciesOverride.spriteSlug,
-        regionCodeOverride: speciesOverride.regionCode,
-        catchKeyOverride: speciesOverride.catchKey,
-        sortIndex: speciesOverride.sortIndex ?? dexNumber,
-      });
+        { ...speciesOverride, form, dexNumber },
+        dexNumber
+      );
+      definitions.push(definition);
     });
 
     const manualEntries = Array.isArray(source.manualEntries)
@@ -800,18 +1156,12 @@ async function createDexEntries(source, speciesById, allSpecies, context = {}) {
       const speciesId = entry.speciesId ?? entry.id;
       if (!speciesId) return;
       const dexNumber = entry.dexNumber ?? manualStartIndex + index;
-      definitions.push({
+      const definition = createEntryDefinition(
         speciesId,
-        form: entry.form,
-        dexNumber,
-        displayDexNumber: entry.displayDexNumber,
-        nameOverride: entry.name,
-        spriteOverride: entry.sprite,
-        spriteSlugOverride: entry.spriteSlug,
-        regionCodeOverride: entry.regionCode,
-        catchKeyOverride: entry.catchKey,
-        sortIndex: entry.sortIndex ?? dexNumber,
-      });
+        { ...entry, dexNumber },
+        dexNumber
+      );
+      definitions.push(definition);
     });
 
     return sortDexEntries(
