@@ -27,6 +27,26 @@ const state = {
 
 const DEX_SELECTION_STORAGE_KEY = `${STORAGE_KEY}:dex-selection`;
 
+async function ensurePokedexData() {
+  if (window.POKEDEX_DATA && !window.POKEDEX_DATA.then) {
+    return window.POKEDEX_DATA;
+  }
+
+  if (window.POKEDEX_DATA_PROMISE && typeof window.POKEDEX_DATA_PROMISE.then === "function") {
+    const data = await window.POKEDEX_DATA_PROMISE;
+    window.POKEDEX_DATA = data;
+    return data;
+  }
+
+  if (window.POKEDEX_DATA && typeof window.POKEDEX_DATA.then === "function") {
+    const data = await window.POKEDEX_DATA;
+    window.POKEDEX_DATA = data;
+    return data;
+  }
+
+  return null;
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -346,9 +366,20 @@ function setupDialog() {
   });
 }
 
-function init() {
-  if (!window.POKEDEX_DATA) {
-    dom.dexGrid.innerHTML = "<p>Geen Pokédex data beschikbaar.</p>";
+async function init() {
+  dom.dexGrid.innerHTML = "<p class=\"loading-message\">Pokédexgegevens laden…</p>";
+
+  try {
+    const data = await ensurePokedexData();
+    if (!data || !Array.isArray(data.games) || !data.games.length) {
+      dom.dexGrid.innerHTML =
+        "<p>Geen Pokédex data beschikbaar. Controleer je internetverbinding.</p>";
+      return;
+    }
+  } catch (error) {
+    console.error("Kon Pokédex data niet laden:", error);
+    dom.dexGrid.innerHTML =
+      "<p>Kon Pokédex data niet laden. Controleer je internetverbinding en probeer opnieuw.</p>";
     return;
   }
 
@@ -369,7 +400,9 @@ function init() {
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("DOMContentLoaded", () => {
+    init();
+  });
 } else {
   init();
 }

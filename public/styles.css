@@ -257,6 +257,12 @@ body::before {
   cursor: pointer;
 }
 
+.loading-message {
+  padding: 2rem 1rem;
+  text-align: center;
+  font-weight: 600;
+}
+
 @media (max-width: 900px) {
   .dex-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
