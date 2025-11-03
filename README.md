@@ -11,10 +11,12 @@ Een eenvoudige webapplicatie om een Living Dex bij te houden voor meerdere Poké
 - Klik op de naam van een Pokémon voor een gedetailleerd overzicht met types, 3D-sprite, vanglocaties (inclusief fallback-locaties voor nieuwere spellen), evoluties en in welke spellen de soort beschikbaar is.
 - Markeer Pokémon afzonderlijk of gebruik de nieuwe “Alles selecteren/Alles wissen”-acties om de huidige selectie in één keer bij te werken. De voortgang wordt lokaal opgeslagen in de browser.
 - Herken Mega-evoluties en Gigantamax-vormen via speciale iconen en open hun detailkaarten rechtstreeks vanuit de basisvorm.
+- Toon naar wens alle Mega- of Gigantamax-sprites in de boxweergave en filter in de Pokémon HOME Pokédex op soorten met een Mega- of G-Max-variant.
 - Navigeer sneller tussen boxen of typ direct het gewenste boxnummer in het nieuwe boxveld.
 - Markeer welke Pokémon je hebt gevangen. De voortgang wordt lokaal opgeslagen in de browser.
 - Zoek binnen de geselecteerde Living Dex.
 - Houd ook de complete Pokémon HOME Pokédex bij.
+- Ondersteuning uitgebreid met klassieke spellen van Red/Blue tot en met Ultra Sun & Ultra Moon (inclusief Mega-overzichtsdexen waar relevant).
 - Nummering toont nu het regionale dexnummer gevolgd door het nationale nummer (bijv. `#031 (#079*G)` voor Galarian Slowpoke). Een `*` met regioletter onderscheidt regionale vormen.
 - Regionale vormen gebruiken nu automatisch de bijbehorende PokéAPI `pokemon-form` sprites, zodat Alolan, Galarian, Hisuian en Paldean varianten correct worden weergegeven.
 

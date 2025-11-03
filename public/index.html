@@ -85,9 +85,9 @@
             </select>
           </label>
 
-          <div class="control box-picker" role="group" aria-label="Box selectie">
-            <span class="control-label">Geselecteerde box</span>
-            <div class="box-picker__controls">
+          <label class="control" for="box-input">
+            <span>Box</span>
+            <div class="box-picker" role="group" aria-label="Box selectie">
               <button type="button" id="previous-box" class="box-button" aria-label="Vorige box">
                 ◀
               </button>
@@ -104,7 +104,16 @@
                 ▶
               </button>
             </div>
-          </div>
+          </label>
+
+          <label class="control" for="special-filter" id="special-filter-control" hidden>
+            <span>Speciale vormen</span>
+            <select id="special-filter" name="special-filter">
+              <option value="all">Alle</option>
+              <option value="mega">Mega beschikbaar</option>
+              <option value="gmax">G-Max beschikbaar</option>
+            </select>
+          </label>
         </div>
 
         <div class="control-group control-group--actions" role="group" aria-label="Acties voor Pokédex">
@@ -114,6 +123,17 @@
           <button type="button" id="clear-all" class="action-button">
             Alles wissen
           </button>
+          <div class="action-button-group" id="sprite-mode-actions" hidden>
+            <button type="button" id="show-default-sprites" class="action-button">
+              Standaard sprites
+            </button>
+            <button type="button" id="show-mega-sprites" class="action-button">
+              Toon Mega-sprites
+            </button>
+            <button type="button" id="show-gmax-sprites" class="action-button">
+              Toon G-Max-sprites
+            </button>
+          </div>
         </div>
       </section>
 
@@ -135,16 +155,18 @@
 
     <template id="pokemon-card-template">
       <button class="pokemon-card" type="button" data-caught="false">
-        <div class="sprite-wrapper" aria-hidden="true">
+        <div class="pokemon-card__media" aria-hidden="true">
           <img class="pokemon-sprite" alt="" loading="lazy" />
           <span class="caught-indicator" aria-hidden="true">✔</span>
+          <div class="pokemon-card__overlay">
+            <div class="pokemon-card__top">
+              <span class="pokemon-number"></span>
+              <div class="pokemon-special"></div>
+            </div>
+            <span class="pokemon-name" role="button" tabindex="0"></span>
+            <div class="pokemon-types"></div>
+          </div>
         </div>
-        <div class="pokemon-label">
-          <span class="pokemon-number"></span>
-          <span class="pokemon-name" role="button" tabindex="0"></span>
-          <div class="pokemon-special"></div>
-        </div>
-        <div class="pokemon-types" aria-hidden="true"></div>
       </button>
     </template>
 

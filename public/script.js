@@ -9,10 +9,16 @@ const dom = {
   searchInput: document.getElementById("search-input"),
   sortSelect: document.getElementById("sort-select"),
   caughtFilter: document.getElementById("caught-filter"),
+  specialFilter: document.getElementById("special-filter"),
+  specialFilterControl: document.getElementById("special-filter-control"),
   viewGridToggle: document.getElementById("view-grid"),
   viewListToggle: document.getElementById("view-list"),
   selectAll: document.getElementById("select-all"),
   clearAll: document.getElementById("clear-all"),
+  spriteModeActions: document.getElementById("sprite-mode-actions"),
+  showDefaultSprites: document.getElementById("show-default-sprites"),
+  showMegaSprites: document.getElementById("show-mega-sprites"),
+  showGmaxSprites: document.getElementById("show-gmax-sprites"),
   dexGrid: document.getElementById("dex-grid"),
   dexList: document.getElementById("dex-list"),
   dexListBody: document.getElementById("dex-list-body"),
@@ -45,6 +51,8 @@ const state = {
   viewMode: "grid",
   sort: "dex",
   caughtFilter: "all",
+  specialFilter: "all",
+  spriteMode: "default",
   filters: {
     search: "",
   },
@@ -452,6 +460,52 @@ function applyCaughtFilter(entries, caughtSet) {
   });
 }
 
+function hasSpecialForm(entry, type) {
+  if (!entry) return false;
+  return getSpecialFormsForSpecies(entry.speciesId).some((form) => form.type === type);
+}
+
+function applySpecialFormFilter(entries, filter = state.specialFilter) {
+  if (filter === "all") {
+    return entries;
+  }
+  return entries.filter((entry) => hasSpecialForm(entry, filter));
+}
+
+function computeSpecialAvailability(entries = []) {
+  return entries.reduce(
+    (result, entry) => {
+      const forms = getSpecialFormsForSpecies(entry.speciesId);
+      forms.forEach(({ type }) => {
+        if (type === "mega") result.mega = true;
+        if (type === "gmax") result.gmax = true;
+      });
+      return result;
+    },
+    { mega: false, gmax: false }
+  );
+}
+
+function resolveActiveSpecialFilter(availability) {
+  const hasMega = Boolean(availability?.mega);
+  const hasGmax = Boolean(availability?.gmax);
+  const supportsFilter = state.currentGameId === "pokemon-home" && (hasMega || hasGmax);
+  let filter = state.specialFilter;
+  if (!supportsFilter) {
+    filter = "all";
+  } else {
+    if (filter === "mega" && !hasMega) filter = "all";
+    if (filter === "gmax" && !hasGmax) filter = "all";
+  }
+  if (filter !== state.specialFilter) {
+    state.specialFilter = filter;
+    if (dom.specialFilter) {
+      dom.specialFilter.value = filter;
+    }
+  }
+  return filter;
+}
+
 function getSortValue(entry, sortKey) {
   if (sortKey === "name") {
     return entry.name?.toLowerCase?.() || "";
@@ -548,10 +602,10 @@ function renderTypeBadges(container, types = []) {
   if (!container) return;
   container.innerHTML = "";
   if (!Array.isArray(types) || !types.length) {
-    container.hidden = true;
+    container.classList.add("pokemon-types--empty");
     return;
   }
-  container.hidden = false;
+  container.classList.remove("pokemon-types--empty");
   types.forEach((type) => {
     if (!type) return;
     const badge = document.createElement("span");
@@ -561,6 +615,8 @@ function renderTypeBadges(container, types = []) {
     if (meta) {
       badge.style.setProperty("--badge-bg", meta.background);
       badge.style.setProperty("--badge-fg", meta.color);
+      badge.style.backgroundColor = meta.background;
+      badge.style.color = meta.color;
     }
     badge.textContent = type.name || formatTypeLabel(slug);
     container.append(badge);
@@ -585,6 +641,13 @@ function updateEntryTypes(entry, types = []) {
 
 function resolveSprite(entry, details, options = {}) {
   const preferHome = Boolean(options.preferHome);
+  const preferEntry = Boolean(options.preferEntry);
+  if (options.overrideSprite) {
+    return options.overrideSprite;
+  }
+  if (preferEntry && entry?.sprite) {
+    return entry.sprite;
+  }
   if (details?.sprites) {
     if (preferHome && details.sprites.home) {
       return details.sprites.home;
@@ -602,12 +665,28 @@ function resolveSprite(entry, details, options = {}) {
       return details.sprites.artwork;
     }
   }
+  if (!preferHome && entry?.sprite) return entry.sprite;
   if (entry?.sprite) return entry.sprite;
   if (typeof window.POKEDEX_DATA?.sprites?.default === "function") {
     const id = entry?.pokemonId || entry?.speciesId;
     return window.POKEDEX_DATA.sprites.default(id);
   }
   return "";
+}
+
+function getSpriteForEntry(entry, details) {
+  if (!entry) return "";
+  if (state.spriteMode === "mega" || state.spriteMode === "gmax") {
+    const forms = getSpecialFormsForSpecies(entry.speciesId);
+    const match = forms.find((form) => form.type === state.spriteMode);
+    if (match?.variant) {
+      const variantSprite = getVariantSprite(match.variant);
+      if (variantSprite) {
+        return variantSprite;
+      }
+    }
+  }
+  return resolveSprite(entry, details, { preferHome: false, preferEntry: true });
 }
 
 function getSpecialFormsForSpecies(speciesId) {
@@ -618,6 +697,15 @@ function getSpecialFormsForSpecies(speciesId) {
   const gmax = state.variantsBySpecies?.gmax?.[id] || [];
   gmax.forEach((variant) => results.push({ type: "gmax", variant }));
   return results;
+}
+
+function getVariantSprite(variant) {
+  if (!variant) return "";
+  if (variant.sprite) return variant.sprite;
+  if (variant.pokemonId && typeof window.POKEDEX_DATA?.sprites?.default === "function") {
+    return window.POKEDEX_DATA.sprites.default(variant.pokemonId);
+  }
+  return "";
 }
 
 function findVariantDefinition(speciesId, form) {
@@ -766,10 +854,11 @@ function renderGrid(entries, caughtSet) {
     }
 
     const cachedDetails = getCachedPokemonDetails(entry);
-    const spriteUrl = resolveSprite(entry, cachedDetails, { preferHome: false });
+    const spriteUrl = getSpriteForEntry(entry, cachedDetails);
     if (sprite) {
       sprite.src = spriteUrl || "";
       sprite.alt = `${entry.name} sprite`;
+      sprite.dataset.mode = state.spriteMode;
     }
 
     renderTypeBadges(typesContainer, entry.types || cachedDetails?.types || []);
@@ -783,6 +872,7 @@ function renderGrid(entries, caughtSet) {
     if (detailKey) {
       card.dataset.entryKey = detailKey;
     }
+    card.dataset.spriteMode = state.spriteMode;
 
     card.addEventListener("click", () => {
       toggleCaught(catchKey);
@@ -793,6 +883,31 @@ function renderGrid(entries, caughtSet) {
         toggleCaught(catchKey);
       }
     });
+
+    if (detailKey) {
+      ensurePokemonDetails(entry).then((details) => {
+        if (!details) return;
+        if (details.types?.length) {
+          updateEntryTypes(entry, details.types);
+        }
+        if (state.spriteMode === "default") {
+          const cardNode = dom.dexGrid?.querySelector(
+            `.pokemon-card[data-entry-key="${escapeSelector(detailKey)}"]`
+          );
+          const imageNode = cardNode?.querySelector?.(".pokemon-sprite");
+          const nextSprite = getSpriteForEntry(entry, details);
+          if (imageNode && nextSprite && imageNode.src !== nextSprite) {
+            imageNode.src = nextSprite;
+          }
+        }
+      });
+    } else {
+      ensurePokemonDetails(entry).then((details) => {
+        if (details?.types?.length) {
+          updateEntryTypes(entry, details.types);
+        }
+      });
+    }
 
     fragment.append(card);
   });
@@ -850,15 +965,19 @@ function createListRow(entry, caughtSet) {
   return node;
 }
 
-function renderList(entries) {
+function renderList(entries, caughtSet = getCaughtSet(state.currentGameId)) {
   if (!dom.dexListBody || !dom.listRowTemplate) return;
   dom.dexListBody.innerHTML = "";
   const fragment = document.createDocumentFragment();
-  const caughtSet = getCaughtSet(state.currentGameId);
   entries.forEach((entry) => {
     const row = createListRow(entry, caughtSet);
     if (row) {
       fragment.append(row);
+      ensurePokemonDetails(entry).then((details) => {
+        if (details?.types?.length) {
+          updateEntryTypes(entry, details.types);
+        }
+      });
     }
   });
   dom.dexListBody.append(fragment);
@@ -943,13 +1062,7 @@ function clearAllVisible() {
 }
 
 function getVisibleEntries() {
-  const currentDex = getCurrentDex();
-  if (!currentDex) return [];
-  const entries = Array.isArray(currentDex.entries) ? currentDex.entries : [];
-  const searchTerm = state.filters.search || "";
-  const caughtSet = getCaughtSet(state.currentGameId);
-  const searched = entries.filter((entry) => matchesSearch(entry, searchTerm));
-  return applyCaughtFilter(searched, caughtSet);
+  return getFilterContext().filteredEntries;
 }
 
 function isGridView() {
@@ -1003,6 +1116,65 @@ function updateBoxIndicator(current, total) {
     }
   }
   updateBoxControls();
+}
+
+function resolveSpriteMode(baseAvailability) {
+  const hasMega = Boolean(baseAvailability?.mega);
+  const hasGmax = Boolean(baseAvailability?.gmax);
+  if (state.spriteMode === "mega" && !hasMega) {
+    state.spriteMode = "default";
+  }
+  if (state.spriteMode === "gmax" && !hasGmax) {
+    state.spriteMode = "default";
+  }
+  if (!isGridView() && state.spriteMode !== "default") {
+    state.spriteMode = "default";
+  }
+}
+
+function updateSpecialFilterControl(baseAvailability) {
+  const hasMega = Boolean(baseAvailability?.mega);
+  const hasGmax = Boolean(baseAvailability?.gmax);
+  const shouldShow = state.currentGameId === "pokemon-home" && (hasMega || hasGmax);
+  if (dom.specialFilterControl) {
+    dom.specialFilterControl.hidden = !shouldShow;
+  }
+  if (dom.specialFilter) {
+    const megaOption = dom.specialFilter.querySelector('option[value="mega"]');
+    const gmaxOption = dom.specialFilter.querySelector('option[value="gmax"]');
+    if (megaOption) megaOption.disabled = !hasMega;
+    if (gmaxOption) gmaxOption.disabled = !hasGmax;
+    dom.specialFilter.value = state.specialFilter;
+  }
+}
+
+function updateSpriteModeActions(baseAvailability) {
+  const hasMega = Boolean(baseAvailability?.mega);
+  const hasGmax = Boolean(baseAvailability?.gmax);
+  const isGrid = isGridView();
+  const shouldShow = isGrid && (hasMega || hasGmax);
+  if (dom.spriteModeActions) {
+    dom.spriteModeActions.hidden = !shouldShow;
+  }
+  if (dom.showDefaultSprites) {
+    dom.showDefaultSprites.disabled = !isGrid || state.spriteMode === "default";
+    dom.showDefaultSprites.classList.toggle("is-active", state.spriteMode === "default");
+  }
+  if (dom.showMegaSprites) {
+    dom.showMegaSprites.disabled = !isGrid || !hasMega;
+    dom.showMegaSprites.classList.toggle("is-active", state.spriteMode === "mega");
+  }
+  if (dom.showGmaxSprites) {
+    dom.showGmaxSprites.disabled = !isGrid || !hasGmax;
+    dom.showGmaxSprites.classList.toggle("is-active", state.spriteMode === "gmax");
+  }
+}
+
+function setSpriteMode(mode) {
+  const normalized = mode === "mega" ? "mega" : mode === "gmax" ? "gmax" : "default";
+  if (state.spriteMode === normalized) return;
+  state.spriteMode = normalized;
+  renderDex();
 }
 
 function setViewMode(mode) {
@@ -1545,13 +1717,26 @@ function populateDexSelect() {
 }
 
 function getFilteredEntries() {
+  return getFilterContext().filteredEntries;
+}
+
+function getFilterContext() {
   const currentDex = getCurrentDex();
-  if (!currentDex) return [];
-  const entries = Array.isArray(currentDex.entries) ? currentDex.entries : [];
+  const baseEntries = Array.isArray(currentDex?.entries) ? currentDex.entries : [];
+  const baseAvailability = computeSpecialAvailability(baseEntries);
   const searchTerm = state.filters.search || "";
   const caughtSet = getCaughtSet(state.currentGameId);
-  const searched = entries.filter((entry) => matchesSearch(entry, searchTerm));
-  return applyCaughtFilter(searched, caughtSet);
+  const searchEntries = baseEntries.filter((entry) => matchesSearch(entry, searchTerm));
+  const activeSpecialFilter = resolveActiveSpecialFilter(baseAvailability);
+  const specialFiltered = applySpecialFormFilter(searchEntries, activeSpecialFilter);
+  const filteredEntries = applyCaughtFilter(specialFiltered, caughtSet);
+  return {
+    baseEntries,
+    searchEntries,
+    filteredEntries,
+    baseAvailability,
+    caughtSet,
+  };
 }
 
 function renderDex() {
@@ -1561,6 +1746,8 @@ function renderDex() {
     if (dom.dexListBody) dom.dexListBody.innerHTML = "";
     state.totalBoxes = 1;
     updateBoxIndicator(0, 1);
+    updateSpecialFilterControl({ mega: false, gmax: false });
+    updateSpriteModeActions({ mega: false, gmax: false });
     updateViewToggleButtons();
     updateBoxControls();
     return;
@@ -1573,12 +1760,19 @@ function renderDex() {
     if (dom.emptyDialog?.open) dom.emptyDialog.close();
     state.totalBoxes = 1;
     updateBoxIndicator(0, 1);
+    updateSpecialFilterControl({ mega: false, gmax: false });
+    updateSpriteModeActions({ mega: false, gmax: false });
     updateViewToggleButtons();
     updateBoxControls();
     return;
   }
 
-  const entries = getFilteredEntries();
+  const context = getFilterContext();
+  resolveSpriteMode(context.baseAvailability);
+  updateSpecialFilterControl(context.baseAvailability);
+  updateSpriteModeActions(context.baseAvailability);
+
+  const entries = context.filteredEntries;
   if (!entries.length) {
     if (dom.dexGrid) dom.dexGrid.innerHTML = "";
     if (dom.dexListBody) dom.dexListBody.innerHTML = "";
@@ -1605,11 +1799,11 @@ function renderDex() {
     const start = state.currentBox * BOX_SIZE;
     const end = start + BOX_SIZE;
     const subset = ordered.slice(start, end);
-    renderGrid(subset, getCaughtSet(state.currentGameId));
+    renderGrid(subset, context.caughtSet);
     updateBoxIndicator(state.currentBox, totalBoxes);
   } else {
     state.totalBoxes = 1;
-    renderList(ordered);
+    renderList(ordered, context.caughtSet);
     if (dom.dexGrid) dom.dexGrid.innerHTML = "";
     updateBoxIndicator(0, 1);
   }
@@ -1646,6 +1840,12 @@ function onSortChange(event) {
 
 function onCaughtFilterChange(event) {
   state.caughtFilter = event.target.value;
+  state.currentBox = 0;
+  renderDex();
+}
+
+function onSpecialFilterChange(event) {
+  state.specialFilter = event.target.value || "all";
   state.currentBox = 0;
   renderDex();
 }
@@ -1728,6 +1928,7 @@ async function init() {
   dom.searchInput?.addEventListener("input", onSearchInput);
   dom.sortSelect?.addEventListener("change", onSortChange);
   dom.caughtFilter?.addEventListener("change", onCaughtFilterChange);
+  dom.specialFilter?.addEventListener("change", onSpecialFilterChange);
   dom.viewGridToggle?.addEventListener("click", () => setViewMode("grid"));
   dom.viewListToggle?.addEventListener("click", () => setViewMode("list"));
   dom.selectAll?.addEventListener("click", selectAllVisible);
@@ -1736,6 +1937,9 @@ async function init() {
   dom.nextBox?.addEventListener("click", () => changeBox(1));
   dom.boxInput?.addEventListener("change", onBoxInputChange);
   dom.boxInput?.addEventListener("keydown", onBoxInputKeyDown);
+  dom.showDefaultSprites?.addEventListener("click", () => setSpriteMode("default"));
+  dom.showMegaSprites?.addEventListener("click", () => setSpriteMode("mega"));
+  dom.showGmaxSprites?.addEventListener("click", () => setSpriteMode("gmax"));
 
   renderDex();
 }

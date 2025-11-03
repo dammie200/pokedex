@@ -276,6 +276,8 @@ function groupVariantsBySpecies(variants) {
       regionCode: variant.regionCode || null,
       formSlug: variant.formSlug || null,
       pokemonSlug: variant.pokemonSlug || null,
+      pokemonId: variant.pokemonId || null,
+      sprite: variant.sprite || null,
       category: variant.category || null,
     });
   });
@@ -862,6 +864,227 @@ const GAME_CONFIG = [
         id: "home-alternate",
         name: "Alternate Forms",
         source: { type: "regional-variants" },
+      },
+      {
+        id: "home-mega",
+        name: "Mega Evoluties",
+        source: { type: "mega-forms" },
+      },
+      {
+        id: "home-gmax",
+        name: "Gigantamax Forms",
+        source: { type: "gmax-forms" },
+      },
+    ],
+  },
+  {
+    id: "lets-go",
+    name: "Let's Go Pikachu & Eevee",
+    dexes: [
+      {
+        id: "kanto-lgpe",
+        name: "Kanto Pokédex",
+        source: { type: "pokedex", slugs: ["letsgo-kanto", "kanto"] },
+      },
+      {
+        id: "lgpe-mega",
+        name: "Mega Evoluties",
+        source: {
+          type: "mega-forms",
+          includeSpecies: [3, 6, 9, 15, 18, 65, 80, 94, 115, 127, 130, 142, 150],
+        },
+      },
+    ],
+  },
+  {
+    id: "sun-moon",
+    name: "Sun & Moon",
+    dexes: [
+      {
+        id: "alola",
+        name: "Alola Pokédex",
+        source: { type: "pokedex", slugs: ["original-alola", "alola"] },
+      },
+      {
+        id: "sun-moon-mega",
+        name: "Mega Evoluties",
+        source: { type: "mega-forms" },
+      },
+    ],
+  },
+  {
+    id: "ultra-sun-moon",
+    name: "Ultra Sun & Ultra Moon",
+    dexes: [
+      {
+        id: "alola-ultra",
+        name: "Alola Pokédex (Ultra)",
+        source: { type: "pokedex", slugs: ["ultra-alola", "updated-alola", "alola"] },
+      },
+      {
+        id: "ultra-mega",
+        name: "Mega Evoluties",
+        source: { type: "mega-forms" },
+      },
+    ],
+  },
+  {
+    id: "omega-ruby-alpha-sapphire",
+    name: "Omega Ruby & Alpha Sapphire",
+    dexes: [
+      {
+        id: "hoenn-oras",
+        name: "Hoenn Pokédex",
+        source: { type: "pokedex", slugs: ["updated-hoenn", "hoenn"] },
+      },
+      {
+        id: "oras-mega",
+        name: "Mega Evoluties",
+        source: { type: "mega-forms" },
+      },
+    ],
+  },
+  {
+    id: "x-y",
+    name: "X & Y",
+    dexes: [
+      {
+        id: "kalos-central",
+        name: "Kalos Central Pokédex",
+        source: { type: "pokedex", slugs: ["kalos-central"] },
+      },
+      {
+        id: "kalos-coastal",
+        name: "Kalos Coastal Pokédex",
+        source: { type: "pokedex", slugs: ["kalos-coastal"] },
+      },
+      {
+        id: "kalos-mountain",
+        name: "Kalos Mountain Pokédex",
+        source: { type: "pokedex", slugs: ["kalos-mountain"] },
+      },
+      {
+        id: "kalos-mega",
+        name: "Mega Evoluties",
+        source: { type: "mega-forms" },
+      },
+      {
+        id: "kalos-all",
+        name: "All Pokémon",
+        source: {
+          type: "aggregate",
+          dexIds: ["kalos-central", "kalos-coastal", "kalos-mountain"],
+        },
+      },
+    ],
+  },
+  {
+    id: "black-white",
+    name: "Black & White",
+    dexes: [
+      {
+        id: "unova",
+        name: "Unova Pokédex",
+        source: { type: "pokedex", slugs: ["original-unova"] },
+      },
+    ],
+  },
+  {
+    id: "black-2-white-2",
+    name: "Black 2 & White 2",
+    dexes: [
+      {
+        id: "unova-updated",
+        name: "Unova Pokédex (B2W2)",
+        source: { type: "pokedex", slugs: ["updated-unova", "original-unova"] },
+      },
+    ],
+  },
+  {
+    id: "heartgold-soulsilver",
+    name: "HeartGold & SoulSilver",
+    dexes: [
+      {
+        id: "johto-hgss",
+        name: "Johto Pokédex",
+        source: { type: "pokedex", slugs: ["updated-johto", "original-johto"] },
+      },
+    ],
+  },
+  {
+    id: "diamond-pearl",
+    name: "Diamond & Pearl",
+    dexes: [
+      {
+        id: "sinnoh-dp",
+        name: "Sinnoh Pokédex",
+        source: { type: "pokedex", slugs: ["original-sinnoh"] },
+      },
+    ],
+  },
+  {
+    id: "platinum",
+    name: "Platinum",
+    dexes: [
+      {
+        id: "sinnoh-pt",
+        name: "Sinnoh Pokédex (Platinum)",
+        source: { type: "pokedex", slugs: ["extended-sinnoh", "original-sinnoh"] },
+      },
+    ],
+  },
+  {
+    id: "emerald",
+    name: "Emerald",
+    dexes: [
+      {
+        id: "hoenn-emerald",
+        name: "Hoenn Pokédex",
+        source: { type: "pokedex", slugs: ["hoenn"] },
+      },
+    ],
+  },
+  {
+    id: "ruby-sapphire",
+    name: "Ruby & Sapphire",
+    dexes: [
+      {
+        id: "hoenn-rs",
+        name: "Hoenn Pokédex",
+        source: { type: "pokedex", slugs: ["hoenn"] },
+      },
+    ],
+  },
+  {
+    id: "firered-leafgreen",
+    name: "FireRed & LeafGreen",
+    dexes: [
+      {
+        id: "kanto-frlg",
+        name: "Kanto Pokédex",
+        source: { type: "pokedex", slugs: ["updated-kanto", "kanto"] },
+      },
+    ],
+  },
+  {
+    id: "gold-silver-crystal",
+    name: "Gold, Silver & Crystal",
+    dexes: [
+      {
+        id: "johto-gsc",
+        name: "Johto Pokédex",
+        source: { type: "pokedex", slugs: ["original-johto"] },
+      },
+    ],
+  },
+  {
+    id: "red-blue-yellow",
+    name: "Red, Blue & Yellow",
+    dexes: [
+      {
+        id: "kanto-rby",
+        name: "Kanto Pokédex",
+        source: { type: "pokedex", slugs: ["kanto"] },
       },
     ],
   },
