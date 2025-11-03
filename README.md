@@ -11,6 +11,7 @@ Een eenvoudige webapplicatie om een Living Dex bij te houden voor meerdere Poké
 - Zoek binnen de geselecteerde Living Dex.
 - Houd ook de complete Pokémon HOME Pokédex bij.
 - Nummering toont nu het regionale dexnummer gevolgd door het nationale nummer (bijv. `#031 (#079*G)` voor Galarian Slowpoke). Een `*` met regioletter onderscheidt regionale vormen.
+- Regionale vormen gebruiken nu automatisch de bijbehorende PokéAPI `pokemon-form` sprites, zodat Alolan, Galarian, Hisuian en Paldean varianten correct worden weergegeven.
 
 ## Projectstructuur
 
@@ -37,7 +38,8 @@ komt.
 - `speciesOverrides` (per Pokédex): hiermee kun je basissoorten vervangen door een regionale variant (bijv. Galarian Meowth). Gebruik de `form`-sleutel met een bekende vormcode (zoals `galar`, `hisui`, `paldea-combat`).
 - `entryOverrides`: overschrijft individuele dex-entry's (nummer, naam of sprite) op basis van het Pokédex-volgnummer.
 - `manualEntries`: voeg extra entries toe aan een regionale dex (bijv. extra Paldean Tauros-vormen) met een eigen volgnummer en eventuele vorm.
-- `type: "manual"`-dexen gebruiken de opgegeven lijst letterlijk. Ideaal voor de nieuwe "Other Available Pokémon"-lijsten per spel.
+- `type: "other-available"`-dexen stellen automatisch een lijst samen op basis van PokéAPI `version-group` data en sluiten eerder gedefinieerde dexen uit. Gebruik `versionGroups` om de relevante versies te benoemen, `excludeDexIds` om overlappende dexen weg te filteren, en `ensureSpecies`, `speciesOverrides` of `manualEntries` voor eventuele event- of vormspecifieke aanvullingen.
+- `type: "manual"` blijft beschikbaar voor volledig handmatige lijsten (bijv. wanneer er geen betrouwbare bron bestaat).
 
 Bij het tonen van een Pokémon wordt automatisch het regionale nummer gecombineerd met het nationale nummer, inclusief regioletter voor varianten. Daardoor zie je in één oogopslag welke vorm het betreft en hoe deze in de nationale Pokédex valt.
 
