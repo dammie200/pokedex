@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Living Dex Tracker</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Living Dex Tracker</h1>
+      <p class="tagline">
+        Kies een spel en houd bij welke Pokémon je hebt gevangen.
+      </p>
+    </header>
+
+    <main class="app-main">
+      <section class="controls" aria-label="Dex instellingen">
+        <label class="control" for="game-select">
+          <span>Spel</span>
+          <select id="game-select" name="game-select" aria-label="Selecteer spel"></select>
+        </label>
+
+        <label class="control" for="dex-select">
+          <span>Pokédex</span>
+          <select
+            id="dex-select"
+            name="dex-select"
+            aria-label="Selecteer Pokédex"
+          ></select>
+        </label>
+
+        <label class="control" for="search-input">
+          <span>Zoek Pokémon</span>
+          <input
+            type="search"
+            id="search-input"
+            name="search-input"
+            placeholder="Bijv. Pikachu"
+            autocomplete="off"
+          />
+        </label>
+
+        <div class="control">
+          <span>Geselecteerde box</span>
+          <div class="box-picker" role="group" aria-label="Box selectie">
+            <button type="button" id="previous-box" class="box-button" aria-label="Vorige box">
+              ◀
+            </button>
+            <span id="box-indicator" aria-live="polite">Box 1</span>
+            <button type="button" id="next-box" class="box-button" aria-label="Volgende box">
+              ▶
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="dex" aria-label="Pokemon box">
+        <div id="dex-grid" class="dex-grid"></div>
+      </section>
+    </main>
+
+    <template id="pokemon-card-template">
+      <button class="pokemon-card" type="button" data-caught="false">
+        <div class="sprite-wrapper" aria-hidden="true">
+          <img class="pokemon-sprite" alt="" loading="lazy" />
+          <span class="caught-indicator" aria-hidden="true">✔</span>
+        </div>
+        <div class="pokemon-label">
+          <span class="pokemon-number"></span>
+          <span class="pokemon-name"></span>
+        </div>
+      </button>
+    </template>
+
+    <dialog id="empty-results" class="empty-results">
+      <p>Geen Pokémon gevonden. Pas je filter aan.</p>
+      <button type="button" id="close-empty-results">Sluiten</button>
+    </dialog>
+
+    <footer class="app-footer">
+      <p>
+        Je voortgang wordt lokaal opgeslagen in je browser. Voeg zelf nieuwe
+        spellen of Pokémon toe via <code>public/data/pokemon-data.js</code>.
+      </p>
+    </footer>
+
+    <script src="data/pokemon-data.js"></script>
+    <script src="script.js" type="module"></script>
+  </body>
+</html>
