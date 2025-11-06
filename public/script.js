@@ -128,7 +128,26 @@ const MARK_LABELS = {
   alpha: "Alpha",
 };
 
+const MARK_SYMBOLS = {
+  shiny: "✧",
+  mega: "M",
+  gmax: "G",
+  alpha: "α",
+};
+
 const ALPHA_GAME_IDS = new Set(["legends-arceus", "legends-za"]);
+
+const GMAX_GAME_IDS = new Set(["sword-shield", "pokemon-home"]);
+
+const MEGA_GAME_IDS = new Set([
+  "x-y",
+  "omega-ruby-alpha-sapphire",
+  "sun-moon",
+  "ultra-sun-moon",
+  "lets-go",
+  "legends-za",
+  "pokemon-home",
+]);
 
 const VARIANT_CATEGORY_LABELS = {
   regional: "Regionaal",
@@ -464,6 +483,7 @@ function setEntryMark(entry, markType, shouldMark, gameId = state.currentGameId)
     set.delete(normalized);
   }
   persistMarkState();
+  refreshEntryMarks(entry);
 }
 
 function getCurrentGame() {
@@ -748,11 +768,16 @@ function resolveSprite(entry, details, options = {}) {
   return "";
 }
 
-function getSpriteForEntry(entry, details) {
+function getSpriteForEntry(entry, details, options = {}) {
   if (!entry) return "";
-  if (state.spriteMode === "mega" || state.spriteMode === "gmax") {
+  const mode = options.mode || state.spriteMode || "default";
+  const normalizedMode = mode === "detail" ? "default" : mode;
+  const preferHome = Boolean(options.preferHome);
+  const preferEntry = options.preferEntry !== false;
+  const gameId = options.gameId || state.currentGameId;
+  if (normalizedMode === "mega" || normalizedMode === "gmax") {
     const forms = getSpecialFormsForSpecies(entry.speciesId);
-    const match = forms.find((form) => form.type === state.spriteMode);
+    const match = forms.find((form) => form.type === normalizedMode);
     if (match?.variant) {
       const variantSprite = getVariantSprite(match.variant);
       if (variantSprite) {
@@ -760,18 +785,20 @@ function getSpriteForEntry(entry, details) {
       }
     }
   }
-  if (state.spriteMode === "shiny") {
-    if (details?.sprites?.shiny) {
-      return details.sprites.shiny;
+  const detailsData = details || getCachedPokemonDetails(entry);
+  const shinyMarked = isEntryMarked(entry, "shiny", gameId);
+  if (normalizedMode === "shiny" || (normalizedMode === "default" && shinyMarked)) {
+    if (detailsData?.sprites?.shiny) {
+      return detailsData.sprites.shiny;
     }
   }
-  if (state.spriteMode === "nostalgia") {
-    const nostalgic = getNostalgiaSprite(entry, details);
+  if (normalizedMode === "nostalgia") {
+    const nostalgic = getNostalgiaSprite(entry, detailsData);
     if (nostalgic) {
       return nostalgic;
     }
   }
-  return resolveSprite(entry, details, { preferHome: false, preferEntry: true });
+  return resolveSprite(entry, detailsData, { preferHome, preferEntry });
 }
 
 function getSpecialFormsForSpecies(speciesId) {
@@ -994,6 +1021,7 @@ function renderGrid(entries, caughtSet) {
     const name = card.querySelector(".pokemon-name");
     const special = card.querySelector(".pokemon-special");
     const typesContainer = card.querySelector(".pokemon-types");
+    const marksContainer = card.querySelector(".pokemon-marks");
 
     if (number) {
       number.textContent = entry.displayNumber || "";
@@ -1028,6 +1056,7 @@ function renderGrid(entries, caughtSet) {
 
     renderTypeBadges(typesContainer, entry.types || cachedDetails?.types || []);
     appendSpecialForms(special, entry);
+    renderEntryMarks(marksContainer, entry);
 
     const catchKey = getEntryCatchKey(entry);
     const isCaught = catchKey ? caughtSet.has(String(catchKey)) : false;
@@ -1099,6 +1128,9 @@ function createListRow(entry, caughtSet) {
 
   const specialContainer = node.querySelector(".pokemon-special");
   appendSpecialForms(specialContainer, entry);
+
+  const marksContainer = node.querySelector(".pokemon-marks");
+  renderEntryMarks(marksContainer, entry);
 
   const statusButton = node.querySelector(".status-toggle");
   if (statusButton) {
@@ -1440,21 +1472,36 @@ function jumpToBox(boxNumber) {
   }
 }
 
+function currentGameSupportsMega(gameId = state.currentGameId) {
+  if (!gameId) return false;
+  return MEGA_GAME_IDS.has(gameId);
+}
+
+function currentGameSupportsGmax(gameId = state.currentGameId) {
+  if (!gameId) return false;
+  return GMAX_GAME_IDS.has(gameId);
+}
+
+function currentGameSupportsAlpha(gameId = state.currentGameId) {
+  if (!gameId) return false;
+  return ALPHA_GAME_IDS.has(gameId);
+}
+
 function getAvailableMarks(entry) {
   if (!entry) return [];
-  const available = new Set();
-  available.add("shiny");
+  const marks = new Set();
+  marks.add("shiny");
   const forms = getSpecialFormsForSpecies(entry.speciesId);
-  if (forms.some((form) => form.type === "gmax")) {
-    available.add("gmax");
+  if (currentGameSupportsGmax() && forms.some((form) => form.type === "gmax")) {
+    marks.add("gmax");
   }
-  if (forms.some((form) => form.type === "mega")) {
-    available.add("mega");
+  if (currentGameSupportsMega() && forms.some((form) => form.type === "mega")) {
+    marks.add("mega");
   }
-  if (ALPHA_GAME_IDS.has(state.currentGameId)) {
-    available.add("alpha");
+  if (currentGameSupportsAlpha()) {
+    marks.add("alpha");
   }
-  return Array.from(available).filter((mark) => MARK_TYPES.includes(mark));
+  return Array.from(marks).filter((mark) => MARK_TYPES.includes(mark));
 }
 
 function renderDetailMarks(container, entry) {
@@ -1470,21 +1517,169 @@ function renderDetailMarks(container, entry) {
   }
 
   marks.forEach((mark) => {
-    const label = document.createElement("label");
-    label.className = "pokemon-details__mark";
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.dataset.mark = mark;
-    input.checked = isEntryMarked(entry, mark);
-    label.append(input);
+    const wrapper = document.createElement("div");
+    wrapper.className = "pokemon-details__mark-status";
+    const symbol = document.createElement("span");
+    symbol.className = "pokemon-details__mark-symbol";
+    symbol.textContent = MARK_SYMBOLS[mark] || mark.toUpperCase();
+    wrapper.append(symbol);
 
     const textNode = document.createElement("span");
-    textNode.className = "pokemon-details__mark-label";
-    textNode.textContent = MARK_LABELS[mark] || mark;
-    label.append(textNode);
+    textNode.className = "pokemon-details__mark-text";
+    const active = isEntryMarked(entry, mark);
+    textNode.textContent = `${MARK_LABELS[mark] || mark}: ${active ? "Ja" : "Nee"}`;
+    wrapper.append(textNode);
+    wrapper.dataset.active = String(active);
+    wrapper.classList.toggle("is-active", active);
 
-    container.append(label);
+    container.append(wrapper);
   });
+}
+
+function createMarkToggle(entry, mark) {
+  if (!entry || !mark) return null;
+  const entryKey = getEntryCatchKey(entry);
+  if (!entryKey) return null;
+  const label = document.createElement("label");
+  label.className = "mark-toggle";
+  label.title = MARK_LABELS[mark] || mark;
+
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.className = "mark-toggle__input";
+  input.dataset.mark = mark;
+  input.dataset.entryKey = entryKey;
+  input.checked = isEntryMarked(entry, mark);
+  input.setAttribute("aria-label", MARK_LABELS[mark] || mark);
+  input.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+
+  label.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+  label.addEventListener("keydown", (event) => {
+    event.stopPropagation();
+  });
+
+  label.append(input);
+
+  const symbol = document.createElement("span");
+  symbol.className = "mark-toggle__symbol";
+  symbol.textContent = MARK_SYMBOLS[mark] || mark.toUpperCase();
+  label.append(symbol);
+
+  const srText = document.createElement("span");
+  srText.className = "sr-only";
+  srText.textContent = MARK_LABELS[mark] || mark;
+  label.append(srText);
+
+  return label;
+}
+
+function renderEntryMarks(container, entry) {
+  if (!container) return;
+  container.innerHTML = "";
+  const marks = getAvailableMarks(entry);
+  if (!marks.length) {
+    container.hidden = true;
+    return;
+  }
+  container.hidden = false;
+  marks.forEach((mark) => {
+    const toggle = createMarkToggle(entry, mark);
+    if (toggle) {
+      container.append(toggle);
+    }
+  });
+}
+
+function findEntryByCatchKey(catchKey) {
+  if (!catchKey) return null;
+  const currentDex = getCurrentDex();
+  if (!currentDex || !Array.isArray(currentDex.entries)) return null;
+  const normalized = String(catchKey);
+  return (
+    currentDex.entries.find((entry) => String(getEntryCatchKey(entry)) === normalized) || null
+  );
+}
+
+function updateEntrySprite(entry, details) {
+  if (!entry) return;
+  const catchKey = getEntryCatchKey(entry);
+  if (!catchKey) return;
+  const selector = escapeSelector(catchKey);
+  const card = dom.dexGrid?.querySelector(`.pokemon-card[data-id="${selector}"]`);
+  const cardSprite = card?.querySelector?.(".pokemon-sprite");
+  const data = details || getCachedPokemonDetails(entry);
+  if (cardSprite) {
+    const nextSprite = getSpriteForEntry(entry, data, { preferEntry: true });
+    if (nextSprite) {
+      cardSprite.src = nextSprite;
+      cardSprite.dataset.mode = state.spriteMode;
+    }
+  }
+  if (dom.detailSprite && activeDetailEntry) {
+    const activeKey = getEntryCatchKey(activeDetailEntry);
+    if (activeKey && activeKey === catchKey) {
+      const detailData = data || getCachedPokemonDetails(activeDetailEntry);
+      const detailSprite = getSpriteForEntry(activeDetailEntry, detailData, {
+        mode: "detail",
+        preferHome: true,
+        preferEntry: false,
+      });
+      if (detailSprite) {
+        dom.detailSprite.src = detailSprite;
+      }
+    }
+  }
+}
+
+function refreshEntryMarks(entryOrKey) {
+  const entry =
+    entryOrKey && typeof entryOrKey === "object"
+      ? entryOrKey
+      : findEntryByCatchKey(entryOrKey);
+  if (!entry) return;
+  const catchKey = getEntryCatchKey(entry);
+  if (!catchKey) return;
+  const selector = escapeSelector(catchKey);
+  const card = dom.dexGrid?.querySelector(`.pokemon-card[data-id="${selector}"]`);
+  if (card) {
+    const container = card.querySelector(".pokemon-marks");
+    renderEntryMarks(container, entry);
+  }
+  const row = dom.dexListBody?.querySelector(`.dex-list__row[data-id="${selector}"]`);
+  if (row) {
+    const container = row.querySelector(".pokemon-marks");
+    renderEntryMarks(container, entry);
+  }
+  if (dom.detailMarks && activeDetailEntry) {
+    const activeKey = getEntryCatchKey(activeDetailEntry);
+    if (activeKey && activeKey === catchKey) {
+      renderDetailMarks(dom.detailMarks, activeDetailEntry);
+    }
+  }
+  ensurePokemonDetails(entry).then((details) => {
+    updateEntrySprite(entry, details || getCachedPokemonDetails(entry));
+  });
+}
+
+function onMarkToggleChange(event) {
+  const target = event.target;
+  if (!target || !target.matches('input[type="checkbox"][data-mark][data-entry-key]')) {
+    return;
+  }
+  event.stopPropagation();
+  const markType = target.dataset.mark;
+  const entryKey = target.dataset.entryKey;
+  if (!MARK_TYPES.includes(markType)) return;
+  const entry = findEntryByCatchKey(entryKey);
+  if (!entry) {
+    target.checked = false;
+    return;
+  }
+  setEntryMark(entry, markType, target.checked);
 }
 
 function renderEvolutionSpecialForms(container, entry) {
@@ -1673,7 +1868,11 @@ function showPokemonDetailsLoading(entry) {
   }
 
   if (dom.detailSprite) {
-    const spriteUrl = resolveSprite(entry, cached, { preferHome: true });
+    const spriteUrl = getSpriteForEntry(entry, cached, {
+      mode: "detail",
+      preferHome: true,
+      preferEntry: false,
+    });
     dom.detailSprite.src = spriteUrl || "";
     dom.detailSprite.alt = `${entry.name} sprite`;
   }
@@ -1715,7 +1914,11 @@ function applyPokemonDetails(entry, details) {
   }
   updateEntryTypes(entry, details.types || entry.types || []);
   if (dom.detailSprite) {
-    const spriteUrl = resolveSprite(entry, details, { preferHome: true });
+    const spriteUrl = getSpriteForEntry(entry, details, {
+      mode: "detail",
+      preferHome: true,
+      preferEntry: false,
+    });
     if (spriteUrl) {
       dom.detailSprite.src = spriteUrl;
     }
@@ -1798,21 +2001,6 @@ function setupDetailsDialog() {
     event.preventDefault();
     closePokemonDetails();
   });
-  if (dom.detailMarks) {
-    dom.detailMarks.addEventListener("change", onDetailMarkChange);
-  }
-}
-
-function onDetailMarkChange(event) {
-  const target = event.target;
-  if (!target || !target.matches('input[type="checkbox"][data-mark]')) return;
-  const markType = target.dataset.mark;
-  if (!MARK_TYPES.includes(markType)) return;
-  if (!activeDetailEntry) {
-    target.checked = false;
-    return;
-  }
-  setEntryMark(activeDetailEntry, markType, target.checked);
 }
 
 function formatHeight(decimeters) {
@@ -2302,6 +2490,8 @@ async function init() {
   dom.showMegaSprites?.addEventListener("click", () => setSpriteMode("mega"));
   dom.showGmaxSprites?.addEventListener("click", () => setSpriteMode("gmax"));
   dom.showNostalgiaSprites?.addEventListener("click", () => setSpriteMode("nostalgia"));
+  dom.dexGrid?.addEventListener("change", onMarkToggleChange);
+  dom.dexListBody?.addEventListener("change", onMarkToggleChange);
 
   renderDex();
 }

@@ -19,6 +19,18 @@
   box-sizing: border-box;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -402,7 +414,14 @@ body::before {
 }
 
 .dex-list__cell--status {
-  justify-content: flex-end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.dex-list__cell--status .status-toggle {
+  align-self: flex-end;
 }
 
 .dex-list__name-button {
@@ -646,6 +665,75 @@ body::before {
 
 .pokemon-card__top .pokemon-special {
   margin-left: auto;
+}
+
+.pokemon-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.dex-grid--compact .pokemon-marks {
+  gap: 0.25rem;
+  margin-top: 0.3rem;
+}
+
+.pokemon-marks[hidden] {
+  display: none !important;
+}
+
+.mark-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.mark-toggle__input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mark-toggle__symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease,
+    transform 120ms ease;
+}
+
+.mark-toggle:hover .mark-toggle__symbol,
+.mark-toggle:focus-within .mark-toggle__symbol {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.mark-toggle__input:checked + .mark-toggle__symbol {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #222;
+  box-shadow: 0 6px 14px rgba(255, 203, 5, 0.25);
+}
+
+.dex-list__cell--status .pokemon-marks {
+  margin-top: 0;
+  justify-content: flex-end;
+}
+
+.dex-list__cell--status .mark-toggle__symbol {
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.85rem;
 }
 
 .special-icon {
@@ -933,48 +1021,33 @@ body::before {
 .pokemon-details__marks {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
-.pokemon-details__mark {
+.pokemon-details__mark-status {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.6rem 0.85rem;
-  border-radius: 12px;
+  padding: 0.55rem 0.85rem;
+  border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+  background: rgba(255, 255, 255, 0.05);
+  transition: border-color 120ms ease, background 120ms ease;
 }
 
-.pokemon-details__mark:hover,
-.pokemon-details__mark:focus-within {
-  border-color: rgba(255, 203, 5, 0.7);
-  background: rgba(255, 203, 5, 0.12);
-  transform: translateY(-1px);
+.pokemon-details__mark-status.is-active {
+  border-color: rgba(255, 203, 5, 0.6);
+  background: rgba(255, 203, 5, 0.14);
 }
 
-.pokemon-details__mark input {
-  width: 1.05rem;
-  height: 1.05rem;
-  accent-color: var(--accent);
+.pokemon-details__mark-symbol {
+  font-weight: 700;
+  font-size: 1rem;
 }
 
-.pokemon-details__mark-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.pokemon-details__mark-label::before {
-  content: "";
-  display: inline-block;
-  width: 0.35rem;
-  height: 0.35rem;
-  border-radius: 50%;
-  background: rgba(255, 203, 5, 0.7);
+.pokemon-details__mark-text {
+  font-size: 0.85rem;
+  color: var(--text-muted);
 }
 
 .pokemon-details__variants {

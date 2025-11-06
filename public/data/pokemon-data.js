@@ -1376,6 +1376,15 @@ function capitalize(word) {
   return word[0].toUpperCase() + word.slice(1);
 }
 
+function toTitleCase(value) {
+  if (!value) return "";
+  return String(value)
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .map((segment) => capitalize(segment))
+    .join(" ");
+}
+
 function formatSpeciesName(apiName) {
   if (NAME_OVERRIDES.has(apiName)) {
     return NAME_OVERRIDES.get(apiName);
@@ -1514,6 +1523,39 @@ const versionGroupCache = new Map();
 const pokemonResourceCache = new Map();
 const speciesResourceCache = new Map();
 const evolutionChainCache = new Map();
+
+async function fetchPokemonResource(identifier) {
+  if (identifier === null || identifier === undefined) return null;
+  const key = String(identifier).toLowerCase();
+  if (pokemonResourceCache.has(key)) {
+    return pokemonResourceCache.get(key);
+  }
+  const data = await fetchJson(`${API_BASE_URL}/pokemon/${key}`);
+  pokemonResourceCache.set(key, data);
+  return data;
+}
+
+async function fetchSpeciesResource(speciesId) {
+  if (speciesId === null || speciesId === undefined) return null;
+  const id = Number(speciesId);
+  if (!Number.isFinite(id)) return null;
+  if (speciesResourceCache.has(id)) {
+    return speciesResourceCache.get(id);
+  }
+  const data = await fetchJson(`${API_BASE_URL}/pokemon-species/${id}`);
+  speciesResourceCache.set(id, data);
+  return data;
+}
+
+async function fetchEvolutionChainData(url) {
+  if (!url) return null;
+  if (evolutionChainCache.has(url)) {
+    return evolutionChainCache.get(url);
+  }
+  const data = await fetchJson(url);
+  evolutionChainCache.set(url, data);
+  return data;
+}
 
 async function fetchPokedexEntries(slugs) {
   for (const slug of slugs) {
