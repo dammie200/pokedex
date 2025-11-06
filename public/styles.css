@@ -809,7 +809,39 @@ body::before {
   font-size: 1.1rem;
 }
 
-.pokemon-details__games,
+.pokemon-details__links {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pokemon-details__links[hidden] {
+  display: none !important;
+}
+
+.pokemon-details__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(255, 203, 5, 0.18);
+  border: 1px solid rgba(255, 203, 5, 0.35);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.pokemon-details__link:hover,
+.pokemon-details__link:focus-visible {
+  background: rgba(255, 203, 5, 0.32);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  outline: none;
+}
+
 .pokemon-details__encounters,
 .pokemon-details__evolution {
   display: flex;
@@ -817,36 +849,11 @@ body::before {
   gap: 0.75rem;
 }
 
-.pokemon-details__game,
 .pokemon-details__evolution-step {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 12px;
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.pokemon-details__game-title,
-.pokemon-details__encounter-title {
-  margin: 0 0 0.5rem;
-  font-weight: 600;
-}
-
-.pokemon-details__dexes,
-.pokemon-details__locations,
-.pokemon-details__evolution-methods {
-  margin: 0;
-  padding-left: 1.25rem;
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.pokemon-details__dexes li,
-.pokemon-details__locations li {
-  margin-bottom: 0.35rem;
-}
-
-.pokemon-details__dexes li:last-child,
-.pokemon-details__locations li:last-child {
-  margin-bottom: 0;
 }
 
 .pokemon-details__encounter {
@@ -854,6 +861,10 @@ body::before {
   border-radius: 14px;
   background: rgba(9, 12, 18, 0.4);
   padding: 0.25rem 0.85rem 0.85rem;
+}
+
+.pokemon-details__encounter-summary {
+  width: 100%;
 }
 
 .pokemon-details__encounter summary {
@@ -864,8 +875,9 @@ body::before {
   justify-content: space-between;
   gap: 0.5rem;
   font-weight: 600;
-  padding: 0.6rem 0;
+  padding: 0.65rem 0;
   color: var(--text);
+  margin: 0;
 }
 
 .pokemon-details__encounter summary::-webkit-details-marker {
@@ -876,8 +888,84 @@ body::before {
   color: var(--accent);
 }
 
-.pokemon-details__evolution-step strong {
+.pokemon-details__encounter-body {
+  display: grid;
+  gap: 0.75rem;
+  padding-bottom: 0.35rem;
+}
+
+.pokemon-details__encounter-version {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.pokemon-details__version-title {
+  margin: 0 0 0.4rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.pokemon-details__locations,
+.pokemon-details__evolution-methods {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.pokemon-details__locations li {
+  margin-bottom: 0.35rem;
+}
+
+.pokemon-details__locations li:last-child {
+  margin-bottom: 0;
+}
+
+.pokemon-details__evolution-path {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.pokemon-details__evolution-mon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  text-align: center;
+}
+
+.pokemon-details__evolution-mon.is-current .pokemon-details__evolution-name {
   color: var(--accent);
+  font-weight: 700;
+}
+
+.pokemon-details__evolution-sprite {
+  width: clamp(56px, 6vw, 80px);
+  height: clamp(56px, 6vw, 80px);
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45));
+}
+
+.pokemon-details__evolution-sprite--placeholder {
+  display: inline-block;
+  width: clamp(56px, 6vw, 80px);
+  height: clamp(56px, 6vw, 80px);
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.pokemon-details__evolution-name {
+  font-size: 0.95rem;
+}
+
+.pokemon-details__evolution-arrow {
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .pokemon-details__evolution-methods {

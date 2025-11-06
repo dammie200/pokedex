@@ -44,7 +44,7 @@ const dom = {
   detailSprite: document.getElementById("pokemon-detail-sprite"),
   detailHeight: document.getElementById("pokemon-detail-height"),
   detailWeight: document.getElementById("pokemon-detail-weight"),
-  detailGames: document.getElementById("pokemon-detail-games"),
+  detailLinks: document.getElementById("pokemon-detail-links"),
   detailEncounters: document.getElementById("pokemon-detail-encounters"),
   detailEvolution: document.getElementById("pokemon-detail-evolution"),
 };
@@ -163,6 +163,61 @@ const VERSION_RELEASE_ORDER = [
 const VERSION_ORDER_MAP = new Map(
   VERSION_RELEASE_ORDER.map((slug, index) => [slug, index])
 );
+
+const VERSION_TO_GAME = new Map([
+  ["red", { gameId: "red-blue-yellow", gameName: "Red, Blue & Yellow" }],
+  ["blue", { gameId: "red-blue-yellow", gameName: "Red, Blue & Yellow" }],
+  ["yellow", { gameId: "red-blue-yellow", gameName: "Red, Blue & Yellow" }],
+  ["gold", { gameId: "gold-silver-crystal", gameName: "Gold, Silver & Crystal" }],
+  ["silver", { gameId: "gold-silver-crystal", gameName: "Gold, Silver & Crystal" }],
+  ["crystal", { gameId: "gold-silver-crystal", gameName: "Gold, Silver & Crystal" }],
+  ["ruby", { gameId: "ruby-sapphire", gameName: "Ruby & Sapphire" }],
+  ["sapphire", { gameId: "ruby-sapphire", gameName: "Ruby & Sapphire" }],
+  ["emerald", { gameId: "emerald", gameName: "Emerald" }],
+  ["fire-red", { gameId: "firered-leafgreen", gameName: "FireRed & LeafGreen" }],
+  ["leaf-green", { gameId: "firered-leafgreen", gameName: "FireRed & LeafGreen" }],
+  ["diamond", { gameId: "diamond-pearl", gameName: "Diamond & Pearl" }],
+  ["pearl", { gameId: "diamond-pearl", gameName: "Diamond & Pearl" }],
+  ["platinum", { gameId: "platinum", gameName: "Platinum" }],
+  ["heartgold", { gameId: "heartgold-soulsilver", gameName: "HeartGold & SoulSilver" }],
+  ["soulsilver", { gameId: "heartgold-soulsilver", gameName: "HeartGold & SoulSilver" }],
+  ["black", { gameId: "black-white", gameName: "Black & White" }],
+  ["white", { gameId: "black-white", gameName: "Black & White" }],
+  ["black-2", { gameId: "black-2-white-2", gameName: "Black 2 & White 2" }],
+  ["white-2", { gameId: "black-2-white-2", gameName: "Black 2 & White 2" }],
+  ["x", { gameId: "x-y", gameName: "X & Y" }],
+  ["y", { gameId: "x-y", gameName: "X & Y" }],
+  ["omega-ruby", { gameId: "omega-ruby-alpha-sapphire", gameName: "Omega Ruby & Alpha Sapphire" }],
+  ["alpha-sapphire", { gameId: "omega-ruby-alpha-sapphire", gameName: "Omega Ruby & Alpha Sapphire" }],
+  ["sun", { gameId: "sun-moon", gameName: "Sun & Moon" }],
+  ["moon", { gameId: "sun-moon", gameName: "Sun & Moon" }],
+  ["ultra-sun", { gameId: "ultra-sun-moon", gameName: "Ultra Sun & Ultra Moon" }],
+  ["ultra-moon", { gameId: "ultra-sun-moon", gameName: "Ultra Sun & Ultra Moon" }],
+  ["lets-go-pikachu", { gameId: "lets-go", gameName: "Let's Go Pikachu & Eevee" }],
+  ["lets-go-eevee", { gameId: "lets-go", gameName: "Let's Go Pikachu & Eevee" }],
+  ["sword", { gameId: "sword-shield", gameName: "Sword & Shield" }],
+  ["shield", { gameId: "sword-shield", gameName: "Sword & Shield" }],
+  ["isle-of-armor", { gameId: "sword-shield", gameName: "Sword & Shield" }],
+  ["crown-tundra", { gameId: "sword-shield", gameName: "Sword & Shield" }],
+  ["brilliant-diamond", { gameId: "brilliant-diamond-pearl", gameName: "Brilliant Diamond & Shining Pearl" }],
+  ["shining-pearl", { gameId: "brilliant-diamond-pearl", gameName: "Brilliant Diamond & Shining Pearl" }],
+  ["legends-arceus", { gameId: "legends-arceus", gameName: "Legends Arceus" }],
+  ["scarlet", { gameId: "scarlet-violet", gameName: "Scarlet & Violet" }],
+  ["violet", { gameId: "scarlet-violet", gameName: "Scarlet & Violet" }],
+  ["teal-mask", { gameId: "scarlet-violet", gameName: "Scarlet & Violet" }],
+  ["indigo-disk", { gameId: "scarlet-violet", gameName: "Scarlet & Violet" }],
+  ["home", { gameId: "pokemon-home", gameName: "Pokémon HOME" }],
+]);
+
+const GAME_RELEASE_ORDER_MAP = new Map();
+VERSION_RELEASE_ORDER.forEach((version, index) => {
+  const group = VERSION_TO_GAME.get(version);
+  if (!group) return;
+  const existing = GAME_RELEASE_ORDER_MAP.get(group.gameId);
+  if (existing === undefined || index < existing) {
+    GAME_RELEASE_ORDER_MAP.set(group.gameId, index);
+  }
+});
 
 const VIEW_MODES = {
   GRID: "grid",
@@ -435,6 +490,14 @@ function getVersionOrder(version) {
   if (!slug) return Number.MAX_SAFE_INTEGER;
   if (VERSION_ORDER_MAP.has(slug)) {
     return VERSION_ORDER_MAP.get(slug);
+  }
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function getGameOrder(gameId) {
+  if (!gameId) return Number.MAX_SAFE_INTEGER;
+  if (GAME_RELEASE_ORDER_MAP.has(gameId)) {
+    return GAME_RELEASE_ORDER_MAP.get(gameId);
   }
   return Number.MAX_SAFE_INTEGER;
 }
@@ -1375,86 +1438,304 @@ function jumpToBox(boxNumber) {
   }
 }
 
-function sortEncounterEntries(encounters = []) {
-  return encounters
-    .slice()
-    .sort((a, b) => {
-      const order =
-        getVersionOrder(a.version || a.versionName) -
-        getVersionOrder(b.version || b.versionName);
-      if (order !== 0) return order;
-      const nameA = normalizeVersionSlug(a.version || a.versionName);
-      const nameB = normalizeVersionSlug(b.version || b.versionName);
-      return nameA.localeCompare(nameB);
+function groupEncountersByGame(encounters = []) {
+  const groups = new Map();
+  (encounters || []).forEach((entry) => {
+    if (!entry) return;
+    const versionSlug = normalizeVersionSlug(entry.version || entry.versionName);
+    if (!versionSlug) return;
+    const mapping = VERSION_TO_GAME.get(versionSlug);
+    const versionName =
+      entry.versionName ||
+      VERSION_NAME_OVERRIDES[versionSlug] ||
+      titleCase(entry.version || entry.versionName || "Onbekende versie");
+    const gameId = mapping?.gameId || versionSlug;
+    const gameName = mapping?.gameName || versionName;
+
+    if (!groups.has(gameId)) {
+      groups.set(gameId, {
+        gameId,
+        gameName,
+        versions: new Map(),
+      });
+    }
+
+    const gameGroup = groups.get(gameId);
+    const versionKey = versionSlug || versionName.toLowerCase();
+    if (!gameGroup.versions.has(versionKey)) {
+      gameGroup.versions.set(versionKey, {
+        versionSlug,
+        versionName,
+        locations: new Map(),
+      });
+    }
+
+    const versionGroup = gameGroup.versions.get(versionKey);
+    (entry.locations || []).forEach((location) => {
+      if (!location) return;
+      const locationKey = (location.name || "onbekend").toLowerCase();
+      if (!versionGroup.locations.has(locationKey)) {
+        versionGroup.locations.set(locationKey, {
+          name: formatLocationName(location.name),
+          methods: new Set(),
+        });
+      }
+      const target = versionGroup.locations.get(locationKey);
+      const methods =
+        Array.isArray(location.methods) && location.methods.length
+          ? location.methods
+          : ["Standaard"];
+      methods
+        .filter(Boolean)
+        .forEach((method) => target.methods.add(method));
     });
+  });
+
+  const results = new Map();
+  groups.forEach((group, gameId) => {
+    const versions = Array.from(group.versions.values())
+      .map((version) => ({
+        versionSlug: version.versionSlug,
+        versionName: version.versionName,
+        locations: Array.from(version.locations.values()).map((location) => ({
+          name: location.name,
+          methods: Array.from(location.methods.values()),
+        })),
+      }))
+      .sort((a, b) => {
+        const orderDiff =
+          getVersionOrder(a.versionSlug || a.versionName) -
+          getVersionOrder(b.versionSlug || b.versionName);
+        if (Number.isFinite(orderDiff) && orderDiff !== 0) {
+          return orderDiff;
+        }
+        return a.versionName.localeCompare(b.versionName, "nl", {
+          sensitivity: "base",
+        });
+      });
+
+    results.set(gameId, {
+      gameId,
+      gameName: group.gameName,
+      versions,
+    });
+  });
+
+  return results;
 }
 
-function renderAvailability(container, availability = []) {
-  if (!container) return;
-  container.innerHTML = "";
-  if (!Array.isArray(availability) || !availability.length) {
+function renderGameEncounter(container, gameName, versions = []) {
+  const details = document.createElement("details");
+  details.className = "pokemon-details__encounter pokemon-details__encounter--game";
+
+  const summary = document.createElement("summary");
+  summary.className = "pokemon-details__encounter-title pokemon-details__encounter-summary";
+  summary.textContent = gameName || "Onbekend spel";
+  details.append(summary);
+
+  const body = document.createElement("div");
+  body.className = "pokemon-details__encounter-body";
+
+  if (!versions.length) {
     const empty = document.createElement("p");
     empty.className = "pokemon-details__empty";
-    empty.textContent = "Geen koppelingen met geselecteerde games.";
-    container.append(empty);
-    return;
+    empty.textContent = "Geen vanglocaties bekend voor dit spel.";
+    body.append(empty);
+  } else {
+    versions.forEach((version) => {
+      const block = document.createElement("div");
+      block.className = "pokemon-details__encounter-version";
+
+      const title = document.createElement("h4");
+      title.className = "pokemon-details__version-title";
+      title.textContent = version.versionName;
+      block.append(title);
+
+      if (version.locations && version.locations.length) {
+        const list = document.createElement("ul");
+        list.className = "pokemon-details__locations";
+        version.locations.forEach((location) => {
+          if (!location.name) return;
+          const item = document.createElement("li");
+          const methods = (location.methods || []).filter(Boolean).join(" • ");
+          item.textContent = methods
+            ? `${location.name} — ${methods}`
+            : location.name;
+          list.append(item);
+        });
+        if (list.children.length) {
+          block.append(list);
+        } else {
+          const empty = document.createElement("p");
+          empty.className = "pokemon-details__empty";
+          empty.textContent = "Geen vanglocaties bekend.";
+          block.append(empty);
+        }
+      } else {
+        const empty = document.createElement("p");
+        empty.className = "pokemon-details__empty";
+        empty.textContent = "Geen vanglocaties bekend.";
+        block.append(empty);
+      }
+
+      body.append(block);
+    });
   }
 
-  availability.forEach((entry) => {
-    const wrapper = document.createElement("div");
-    wrapper.className = "pokemon-details__game";
-    const title = document.createElement("p");
-    title.className = "pokemon-details__game-title";
-    title.textContent = entry.gameName;
-    wrapper.append(title);
-
-    const list = document.createElement("ul");
-    list.className = "pokemon-details__dexes";
-    entry.dexes.forEach((dex) => {
-      const item = document.createElement("li");
-      item.textContent = dex.number ? `${dex.name} — ${dex.number}` : dex.name;
-      list.append(item);
-    });
-    wrapper.append(list);
-    container.append(wrapper);
-  });
+  details.append(body);
+  container.append(details);
 }
 
-function renderEncounters(container, encounters = []) {
+function renderEncounters(container, encounters = [], availability = []) {
   if (!container) return;
   container.innerHTML = "";
-  const sorted = sortEncounterEntries(encounters);
-  if (!sorted.length) {
+
+  const grouped = groupEncountersByGame(encounters);
+  const availabilityList = Array.isArray(availability) ? availability.slice() : [];
+  const renderedGameIds = new Set();
+
+  if (availabilityList.length) {
+    availabilityList
+      .sort((a, b) => {
+        const orderDiff = getGameOrder(a.gameId) - getGameOrder(b.gameId);
+        if (Number.isFinite(orderDiff) && orderDiff !== 0) {
+          return orderDiff;
+        }
+        return a.gameName.localeCompare(b.gameName, "nl", { sensitivity: "base" });
+      })
+      .forEach((game) => {
+        const group = grouped.get(game.gameId);
+        renderGameEncounter(container, game.gameName, group?.versions || []);
+        renderedGameIds.add(game.gameId);
+      });
+  }
+
+  grouped.forEach((group, gameId) => {
+    if (renderedGameIds.has(gameId)) return;
+    renderGameEncounter(container, group.gameName, group.versions);
+    renderedGameIds.add(gameId);
+  });
+
+  if (!container.children.length) {
     const empty = document.createElement("p");
     empty.className = "pokemon-details__empty";
     empty.textContent = "Geen bekende vanglocaties.";
     container.append(empty);
+  }
+}
+
+const SEREBII_PATH_BUILDERS = {
+  "generation-i": (id) => `https://www.serebii.net/pokedex/${id}.shtml`,
+  "generation-ii": (id) => `https://www.serebii.net/pokedex-gs/${id}.shtml`,
+  "generation-iii": (id) => `https://www.serebii.net/pokedex-rs/${id}.shtml`,
+  "generation-iv": (id) => `https://www.serebii.net/pokedex-dp/${id}.shtml`,
+  "generation-v": (id) => `https://www.serebii.net/pokedex-bw/${id}.shtml`,
+  "generation-vi": (id) => `https://www.serebii.net/pokedex-xy/${id}.shtml`,
+  "generation-vii": (id) => `https://www.serebii.net/pokedex-sm/${id}.shtml`,
+  "generation-viii": (id, slug) =>
+    `https://www.serebii.net/pokedex-swsh/${slug || id}/`,
+  "generation-ix": (id, slug) => `https://www.serebii.net/pokedex-sv/${slug || id}/`,
+};
+
+function buildSerebiiSlug(details, entry) {
+  const slug = details?.speciesSlug || entry?.pokemonSlug || "";
+  if (slug) {
+    const sanitized = slug.replace(/[^a-z0-9]/g, "");
+    if (sanitized) return sanitized;
+  }
+  const fallback = (details?.name || entry?.name || "").toLowerCase();
+  return fallback.replace(/[^a-z0-9]/g, "");
+}
+
+function buildSerebiiUrl(details, entry) {
+  const speciesId = details?.speciesId || entry?.speciesId;
+  if (!speciesId) return null;
+  const paddedId = String(speciesId).padStart(3, "0");
+  const generation = details?.generation || null;
+  const slug = buildSerebiiSlug(details, entry);
+  const builder = generation ? SEREBII_PATH_BUILDERS[generation] : null;
+  if (typeof builder === "function") {
+    return builder(paddedId, slug);
+  }
+  return `https://www.serebii.net/pokedex/${paddedId}.shtml`;
+}
+
+function buildBulbapediaUrl(details, entry) {
+  const name = details?.name || entry?.name;
+  if (!name) return null;
+  const page = `${name.replace(/\s+/g, "_")}_(Pokémon)`;
+  return `https://bulbapedia.bulbagarden.net/wiki/${encodeURI(page)}`;
+}
+
+function renderExternalLinks(container, details, entry) {
+  if (!container) return;
+  container.innerHTML = "";
+  const links = [];
+  const serebiiUrl = buildSerebiiUrl(details, entry);
+  if (serebiiUrl) {
+    links.push({ label: "Serebii", url: serebiiUrl });
+  }
+  const bulbapediaUrl = buildBulbapediaUrl(details, entry);
+  if (bulbapediaUrl) {
+    links.push({ label: "Bulbapedia", url: bulbapediaUrl });
+  }
+
+  if (!links.length) {
+    container.hidden = true;
     return;
   }
 
-  sorted.forEach((entry) => {
-    const details = document.createElement("details");
-    details.className = "pokemon-details__encounter";
-
-    const summary = document.createElement("summary");
-    summary.className = "pokemon-details__encounter-title";
-    summary.textContent = entry.versionName || entry.version || "Onbekende versie";
-    details.append(summary);
-
-    const list = document.createElement("ul");
-    list.className = "pokemon-details__locations";
-    (entry.locations || []).forEach((location) => {
-      const item = document.createElement("li");
-      const methods = (location.methods || []).filter(Boolean).join(" • ");
-      item.textContent = methods
-        ? `${formatLocationName(location.name)} — ${methods}`
-        : formatLocationName(location.name);
-      list.append(item);
-    });
-
-    details.append(list);
-    container.append(details);
+  container.hidden = false;
+  links.forEach((link) => {
+    const anchor = document.createElement("a");
+    anchor.className = "pokemon-details__link";
+    anchor.href = link.url;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    anchor.textContent = link.label;
+    container.append(anchor);
   });
+}
+
+function getSpeciesSprite(speciesId) {
+  if (!speciesId || typeof window.POKEDEX_DATA?.sprites?.default !== "function") {
+    return "";
+  }
+  try {
+    return window.POKEDEX_DATA.sprites.default(speciesId) || "";
+  } catch (error) {
+    console.warn("Kon sprite niet ophalen voor", speciesId, error);
+    return "";
+  }
+}
+
+function createEvolutionMonNode(data) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "pokemon-details__evolution-mon";
+  if (data?.isCurrent) {
+    wrapper.classList.add("is-current");
+  }
+
+  const spriteUrl = getSpeciesSprite(data?.id);
+  if (spriteUrl) {
+    const img = document.createElement("img");
+    img.className = "pokemon-details__evolution-sprite";
+    img.src = spriteUrl;
+    img.alt = `${data?.name || "Onbekend"} sprite`;
+    img.loading = "lazy";
+    wrapper.append(img);
+  } else {
+    const placeholder = document.createElement("div");
+    placeholder.className = "pokemon-details__evolution-sprite pokemon-details__evolution-sprite--placeholder";
+    wrapper.append(placeholder);
+  }
+
+  const label = document.createElement("span");
+  label.className = "pokemon-details__evolution-name";
+  label.textContent = data?.name || "Onbekend";
+  wrapper.append(label);
+
+  return wrapper;
 }
 
 function renderEvolution(container, evolution = {}, entry) {
@@ -1472,15 +1753,17 @@ function renderEvolution(container, evolution = {}, entry) {
   steps.forEach((step) => {
     const block = document.createElement("div");
     block.className = "pokemon-details__evolution-step";
-    const title = document.createElement("p");
-    title.className = "pokemon-details__encounter-title";
+    const path = document.createElement("div");
+    path.className = "pokemon-details__evolution-path";
 
-    const fromNode = document.createElement(step.from?.isCurrent ? "strong" : "span");
-    fromNode.textContent = step.from?.name || "Onbekend";
-    const toNode = document.createElement(step.to?.isCurrent ? "strong" : "span");
-    toNode.textContent = step.to?.name || "Onbekend";
-    title.append(fromNode, document.createTextNode(" → "), toNode);
-    block.append(title);
+    const fromNode = createEvolutionMonNode(step.from);
+    const arrow = document.createElement("span");
+    arrow.className = "pokemon-details__evolution-arrow";
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.textContent = "→";
+    const toNode = createEvolutionMonNode(step.to);
+    path.append(fromNode, arrow, toNode);
+    block.append(path);
 
     const methods = Array.isArray(step.methods) ? step.methods.filter(Boolean) : [];
     if (methods.length) {
@@ -1577,7 +1860,11 @@ function showPokemonDetailsLoading(entry, availability) {
 
   if (dom.detailHeight) dom.detailHeight.textContent = "Laden…";
   if (dom.detailWeight) dom.detailWeight.textContent = "Laden…";
-  renderAvailability(dom.detailGames, availability);
+
+  if (dom.detailLinks) {
+    dom.detailLinks.innerHTML = "";
+    dom.detailLinks.hidden = true;
+  }
 
   if (dom.detailEncounters) {
     dom.detailEncounters.innerHTML = "";
@@ -1619,17 +1906,20 @@ function applyPokemonDetails(entry, details, availability) {
   if (dom.detailWeight) {
     dom.detailWeight.textContent = formatWeight(details.weight);
   }
-
-  renderAvailability(dom.detailGames, availability);
+  renderExternalLinks(dom.detailLinks, details, entry);
   const manualFallback = buildFallbackEncounters(entry, availability);
   const encounters = details.encounters && details.encounters.length
     ? details.encounters
     : manualFallback;
-  renderEncounters(dom.detailEncounters, encounters);
+  renderEncounters(dom.detailEncounters, encounters, availability);
   renderEvolution(dom.detailEvolution, details.evolution || {}, entry);
 }
 
 function showPokemonDetailsError(message) {
+  if (dom.detailLinks) {
+    dom.detailLinks.innerHTML = "";
+    dom.detailLinks.hidden = true;
+  }
   if (dom.detailEncounters) {
     dom.detailEncounters.innerHTML = "";
     const error = document.createElement("p");
