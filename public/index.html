@@ -10,58 +10,204 @@
     <header class="app-header">
       <h1>Living Dex Tracker</h1>
       <p class="tagline">
-        Kies een spel en houd bij welke Pokémon je hebt gevangen.
+        Kies een spel, bekijk de juiste Pokédex en houd interactief bij welke
+        Pokémon je hebt gevangen.
       </p>
     </header>
 
     <main class="app-main">
       <section class="controls" aria-label="Dex instellingen">
-        <label class="control" for="game-select">
-          <span>Spel</span>
-          <select id="game-select" name="game-select" aria-label="Selecteer spel"></select>
-        </label>
+        <div class="control-group">
+          <label class="control" for="game-select">
+            <span>Spel</span>
+            <select id="game-select" name="game-select" aria-label="Selecteer spel"></select>
+          </label>
 
-        <label class="control" for="search-input">
-          <span>Zoek Pokémon</span>
-          <input
-            type="search"
-            id="search-input"
-            name="search-input"
-            placeholder="Bijv. Pikachu"
-            autocomplete="off"
-          />
-        </label>
+          <label class="control" for="dex-select">
+            <span>Pokédex</span>
+            <select
+              id="dex-select"
+              name="dex-select"
+              aria-label="Selecteer Pokédex"
+            ></select>
+          </label>
 
-        <div class="control">
-          <span>Geselecteerde box</span>
-          <div class="box-picker" role="group" aria-label="Box selectie">
-            <button type="button" id="previous-box" class="box-button" aria-label="Vorige box">
-              ◀
+          <label class="control" for="search-input">
+            <span>Zoek Pokémon</span>
+            <input
+              type="search"
+              id="search-input"
+              name="search-input"
+              placeholder="Bijv. Pikachu"
+              autocomplete="off"
+            />
+          </label>
+        </div>
+
+        <div class="control-group">
+          <fieldset class="control view-toggle" aria-label="Weergave">
+            <legend>Weergave</legend>
+            <div class="toggle-buttons" role="group">
+              <button
+                type="button"
+                id="view-grid"
+                class="toggle-button is-active"
+                aria-pressed="true"
+              >
+                Box
+              </button>
+              <button
+                type="button"
+                id="view-compact"
+                class="toggle-button"
+                aria-pressed="false"
+              >
+                Compacte box
+              </button>
+              <button
+                type="button"
+                id="view-list"
+                class="toggle-button"
+                aria-pressed="false"
+              >
+                Lijst
+              </button>
+            </div>
+          </fieldset>
+
+          <label class="control" for="sort-select">
+            <span>Sorteer</span>
+            <select id="sort-select" name="sort-select">
+              <option value="dex">Pokédex volgorde</option>
+              <option value="national">Nationaal nummer</option>
+              <option value="name">Naam A-Z</option>
+            </select>
+          </label>
+
+          <label class="control" for="caught-filter">
+            <span>Status</span>
+            <select id="caught-filter" name="caught-filter">
+              <option value="all">Alle</option>
+              <option value="caught">Gevangen</option>
+              <option value="uncaught">Niet gevangen</option>
+            </select>
+          </label>
+
+          <label class="control" for="box-input">
+            <span>Box</span>
+            <div class="box-picker" role="group" aria-label="Box selectie">
+              <button type="button" id="previous-box" class="box-button" aria-label="Vorige box">
+                ◀
+              </button>
+              <span id="box-indicator" aria-live="polite">Box 1 / 1</span>
+              <input
+                type="number"
+                id="box-input"
+                class="box-input"
+                min="1"
+                value="1"
+                aria-label="Spring naar specifieke box"
+              />
+              <button type="button" id="next-box" class="box-button" aria-label="Volgende box">
+                ▶
+              </button>
+            </div>
+          </label>
+
+          <label class="control" for="special-filter" id="special-filter-control" hidden>
+            <span>Speciale vormen</span>
+            <select id="special-filter" name="special-filter">
+              <option value="all">Alle</option>
+              <option value="mega">Mega beschikbaar</option>
+              <option value="gmax">G-Max beschikbaar</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="control-group control-group--actions" role="group" aria-label="Acties voor Pokédex">
+          <button type="button" id="select-all" class="action-button">
+            Alles selecteren
+          </button>
+          <button type="button" id="clear-all" class="action-button">
+            Alles wissen
+          </button>
+          <div class="action-button-group" id="sprite-mode-actions" hidden>
+            <button type="button" id="show-default-sprites" class="action-button">
+              Standaard sprites
             </button>
-            <span id="box-indicator" aria-live="polite">Box 1</span>
-            <button type="button" id="next-box" class="box-button" aria-label="Volgende box">
-              ▶
+            <button type="button" id="show-shiny-sprites" class="action-button">
+              Toon Shiny-sprites
+            </button>
+            <button type="button" id="show-mega-sprites" class="action-button">
+              Toon Mega-sprites
+            </button>
+            <button type="button" id="show-gmax-sprites" class="action-button">
+              Toon G-Max-sprites
+            </button>
+            <button type="button" id="show-nostalgia-sprites" class="action-button">
+              Maak nostalgisch
             </button>
           </div>
         </div>
       </section>
 
-      <section class="dex" aria-label="Pokemon box">
-        <div id="dex-grid" class="dex-grid"></div>
+      <section class="dex" aria-label="Pokémon overzicht">
+        <div id="dex-progress" class="dex-progress" hidden>
+          <div id="dex-progress-text" class="dex-progress__text">0 / 0 gevangen</div>
+          <progress
+            id="dex-progress-bar"
+            class="dex-progress__bar"
+            value="0"
+            max="0"
+            aria-label="Pokédex voortgang"
+          >
+            0%
+          </progress>
+        </div>
+        <div class="dex-views">
+          <div id="dex-grid" class="dex-grid" role="grid"></div>
+          <div id="dex-list" class="dex-list" hidden>
+            <div class="dex-list__header" role="row">
+              <span class="dex-list__cell dex-list__cell--number">#</span>
+              <span class="dex-list__cell dex-list__cell--name">Naam</span>
+              <span class="dex-list__cell dex-list__cell--types">Types</span>
+              <span class="dex-list__cell dex-list__cell--status">Status</span>
+            </div>
+            <div id="dex-list-body" class="dex-list__body" role="rowgroup"></div>
+          </div>
+        </div>
       </section>
     </main>
 
     <template id="pokemon-card-template">
       <button class="pokemon-card" type="button" data-caught="false">
-        <div class="sprite-wrapper" aria-hidden="true">
+        <div class="pokemon-card__media" aria-hidden="true">
           <img class="pokemon-sprite" alt="" loading="lazy" />
           <span class="caught-indicator" aria-hidden="true">✔</span>
-        </div>
-        <div class="pokemon-label">
-          <span class="pokemon-number"></span>
-          <span class="pokemon-name"></span>
+          <div class="pokemon-card__overlay">
+            <div class="pokemon-card__top">
+              <span class="pokemon-number"></span>
+              <div class="pokemon-special"></div>
+            </div>
+            <span class="pokemon-name" role="button" tabindex="0"></span>
+            <div class="pokemon-types"></div>
+          </div>
         </div>
       </button>
+    </template>
+
+    <template id="pokemon-list-row-template">
+      <div class="dex-list__row" role="row" data-caught="false">
+        <span class="dex-list__cell dex-list__cell--number"></span>
+        <span class="dex-list__cell dex-list__cell--name">
+          <button type="button" class="dex-list__name-button"></button>
+          <div class="pokemon-special"></div>
+        </span>
+        <span class="dex-list__cell dex-list__cell--types"></span>
+        <span class="dex-list__cell dex-list__cell--status">
+          <button type="button" class="status-toggle">Markeer</button>
+        </span>
+      </div>
     </template>
 
     <dialog id="empty-results" class="empty-results">
@@ -69,10 +215,58 @@
       <button type="button" id="close-empty-results">Sluiten</button>
     </dialog>
 
+    <dialog id="pokemon-details" class="pokemon-details" aria-modal="true">
+      <div class="pokemon-details__container">
+        <button
+          type="button"
+          id="close-pokemon-details"
+          class="pokemon-details__close"
+          aria-label="Sluit Pokémondetails"
+        >
+          ✕
+        </button>
+        <header class="pokemon-details__header">
+          <img
+            id="pokemon-detail-sprite"
+            class="pokemon-details__sprite"
+            alt=""
+            loading="lazy"
+          />
+          <div class="pokemon-details__summary">
+            <p id="pokemon-detail-number" class="pokemon-details__number"></p>
+            <h2 id="pokemon-detail-name" class="pokemon-details__name"></h2>
+            <div id="pokemon-detail-types" class="pokemon-details__types"></div>
+            <dl class="pokemon-details__meta">
+              <div>
+                <dt>Hoogte</dt>
+                <dd id="pokemon-detail-height">-</dd>
+              </div>
+              <div>
+                <dt>Gewicht</dt>
+                <dd id="pokemon-detail-weight">-</dd>
+              </div>
+            </dl>
+          </div>
+        </header>
+        <section class="pokemon-details__section">
+          <h3>Beschikbaar in</h3>
+          <div id="pokemon-detail-games" class="pokemon-details__games"></div>
+        </section>
+        <section class="pokemon-details__section">
+          <h3>Vanglocaties</h3>
+          <div id="pokemon-detail-encounters" class="pokemon-details__encounters"></div>
+        </section>
+        <section class="pokemon-details__section">
+          <h3>Evolutie</h3>
+          <div id="pokemon-detail-evolution" class="pokemon-details__evolution"></div>
+        </section>
+      </div>
+    </dialog>
+
     <footer class="app-footer">
       <p>
-        Je voortgang wordt lokaal opgeslagen in je browser. Voeg zelf nieuwe
-        spellen of Pokémon toe via <code>public/data/pokemon-data.js</code>.
+        Je voortgang wordt lokaal opgeslagen in je browser. Pokédex gegevens
+        worden automatisch opgehaald via de PokéAPI.
       </p>
     </footer>
 
