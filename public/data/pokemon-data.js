@@ -1514,7 +1514,6 @@ const versionGroupCache = new Map();
 const pokemonResourceCache = new Map();
 const speciesResourceCache = new Map();
 const evolutionChainCache = new Map();
-const encounterCache = new Map();
 
 async function fetchPokedexEntries(slugs) {
   for (const slug of slugs) {
@@ -1562,9 +1561,10 @@ async function fetchVersionGroupSpecies(slugs = []) {
 
       const cached = versionGroupCache.get(slug) || [];
       cached.forEach((id) => {
-        if (!speciesSet.has(id)) {
-          speciesSet.set(id, id);
+        if (!id || id > MAX_SPECIES_ID || speciesSet.has(id)) {
+          return;
         }
+        speciesSet.set(id, id);
       });
     } catch (error) {
       console.warn(`Kon version group '${slug}' niet laden:`, error);
@@ -1904,25 +1904,23 @@ async function createDexEntries(source, speciesById, allSpecies, context = {}) {
     const entries = source.entries || [];
     return sortDexEntries(
       entries
-        .map((entry, index) =>
-          {
-            if (!entry) return null;
-            const speciesId = entry.speciesId ?? entry.id ?? null;
-            if (!speciesId) {
-              console.warn("Handmatige lijst-entry mist speciesId en wordt overgeslagen.");
-              return null;
-            }
-            const fallbackNumber = entry.dexNumber ?? index + 1;
-            const override = { ...entry, dexNumber: fallbackNumber };
-            delete override.id;
-            const definition = createEntryDefinition(
-              speciesId,
-              override,
-              fallbackNumber
-            );
-            return buildDexEntry(definition, speciesById);
+        .map((entry, index) => {
+          if (!entry) return null;
+          const speciesId = entry.speciesId ?? entry.id ?? null;
+          if (!speciesId) {
+            console.warn("Handmatige lijst-entry mist speciesId en wordt overgeslagen.");
+            return null;
           }
-        )
+          const fallbackNumber = entry.dexNumber ?? index + 1;
+          const override = { ...entry, dexNumber: fallbackNumber };
+          delete override.id;
+          const definition = createEntryDefinition(
+            speciesId,
+            override,
+            fallbackNumber
+          );
+          return buildDexEntry(definition, speciesById);
+        })
         .filter(Boolean)
     );
   }
@@ -2041,196 +2039,6 @@ async function createDexEntries(source, speciesById, allSpecies, context = {}) {
   }
 
   return [];
-}
-
-function toTitleCase(value) {
-  if (value === null || value === undefined) return "";
-  return String(value)
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map(capitalize)
-    .join(" ");
-}
-
-function formatTypeLabel(type) {
-  if (!type && type !== 0) return "";
-  return toTitleCase(type);
-}
-
-function formatVersionName(version) {
-  if (!version && version !== 0) return "";
-  return toTitleCase(version);
-}
-
-async function fetchPokemonResource(identifier) {
-  if (identifier === null || identifier === undefined) return null;
-  const key = String(identifier).toLowerCase();
-  if (pokemonResourceCache.has(key)) {
-    return pokemonResourceCache.get(key);
-  }
-  try {
-    const data = await fetchJson(`${API_BASE_URL}/pokemon/${key}`);
-    pokemonResourceCache.set(key, data);
-    return data;
-  } catch (error) {
-    console.warn(`Kon pokemon resource '${key}' niet laden:`, error);
-    pokemonResourceCache.set(key, null);
-    return null;
-  }
-}
-
-async function fetchSpeciesResource(speciesId) {
-  if (!speciesId) return null;
-  const key = Number(speciesId);
-  if (speciesResourceCache.has(key)) {
-    return speciesResourceCache.get(key);
-  }
-  try {
-    const data = await fetchJson(`${API_BASE_URL}/pokemon-species/${key}`);
-    speciesResourceCache.set(key, data);
-    return data;
-  } catch (error) {
-    console.warn(`Kon species resource '${key}' niet laden:`, error);
-    speciesResourceCache.set(key, null);
-    return null;
-  }
-}
-
-async function fetchEvolutionChainData(url) {
-  if (!url) return null;
-  if (evolutionChainCache.has(url)) {
-    return evolutionChainCache.get(url);
-  }
-  try {
-    const data = await fetchJson(url);
-    evolutionChainCache.set(url, data);
-    return data;
-  } catch (error) {
-    console.warn(`Kon evolutieketen '${url}' niet laden:`, error);
-    evolutionChainCache.set(url, null);
-    return null;
-  }
-}
-
-function describeEncounterDetail(detail) {
-  if (!detail) return "Standaard";
-  const parts = [];
-  const methodName = detail.method?.name;
-  if (methodName) {
-    parts.push(toTitleCase(methodName));
-  }
-  if (detail.min_level && detail.max_level) {
-    if (detail.min_level === detail.max_level) {
-      parts.push(`Lv. ${detail.min_level}`);
-    } else {
-      parts.push(`Lv. ${detail.min_level}-${detail.max_level}`);
-    }
-  } else if (detail.min_level) {
-    parts.push(`Lv. ${detail.min_level}`);
-  }
-  if (Array.isArray(detail.condition_values) && detail.condition_values.length) {
-    parts.push(
-      detail.condition_values
-        .map((entry) => toTitleCase(entry.name))
-        .join(", ")
-    );
-  }
-  if (detail.time_of_day) {
-    parts.push(toTitleCase(detail.time_of_day));
-  }
-  if (detail.needs_overworld_rain) {
-    parts.push("Regen");
-  }
-  if (detail.turn_upside_down) {
-    parts.push("Keer console om");
-  }
-  if (detail.relative_physical_stats !== null && detail.relative_physical_stats !== undefined) {
-    const value = Number(detail.relative_physical_stats);
-    if (value > 0) parts.push("Aanval > Verdediging");
-    if (value === 0) parts.push("Aanval = Verdediging");
-    if (value < 0) parts.push("Aanval < Verdediging");
-  }
-  if (detail.party_type) {
-    parts.push(`Partijtype: ${formatTypeLabel(detail.party_type.name)}`);
-  }
-  if (detail.party_species) {
-    parts.push(`Partij Pokémon: ${formatSpeciesName(detail.party_species.name)}`);
-  }
-  if (detail.held_item) {
-    parts.push(`Houd ${toTitleCase(detail.held_item.name)}`);
-  }
-  if (detail.item) {
-    parts.push(`Gebruik ${toTitleCase(detail.item.name)}`);
-  }
-  if (detail.known_move) {
-    parts.push(`Kent ${toTitleCase(detail.known_move.name)}`);
-  }
-  if (detail.known_move_type) {
-    parts.push(`Met type ${formatTypeLabel(detail.known_move_type.name)}`);
-  }
-  if (detail.location) {
-    parts.push(`Bij ${toTitleCase(detail.location.name)}`);
-  }
-  if (detail.gender === 1) {
-    parts.push("Vrouwelijk");
-  } else if (detail.gender === 2) {
-    parts.push("Mannelijk");
-  }
-  return parts.join(" • ") || "Standaard";
-}
-
-async function fetchEncounterData(url) {
-  if (!url) return [];
-  if (encounterCache.has(url)) {
-    return encounterCache.get(url);
-  }
-  try {
-    const data = await fetchJson(url);
-    const versionMap = new Map();
-    (Array.isArray(data) ? data : []).forEach((entry) => {
-      const locationName = entry.location_area?.name || "onbekend";
-      (entry.version_details || []).forEach((detail) => {
-        const version = detail.version?.name;
-        if (!version) return;
-        if (!versionMap.has(version)) {
-          versionMap.set(version, new Map());
-        }
-        const locationMap = versionMap.get(version);
-        if (!locationMap.has(locationName)) {
-          locationMap.set(locationName, []);
-        }
-        const methods = locationMap.get(locationName);
-        if (Array.isArray(detail.encounter_details) && detail.encounter_details.length) {
-          detail.encounter_details.forEach((encDetail) => {
-            const description = describeEncounterDetail(encDetail);
-            if (description && !methods.includes(description)) {
-              methods.push(description);
-            }
-          });
-        } else if (!methods.length) {
-          methods.push("Standaard");
-        }
-      });
-    });
-
-    const formatted = Array.from(versionMap.entries())
-      .map(([version, locations]) => ({
-        version,
-        versionName: formatVersionName(version),
-        locations: Array.from(locations.entries()).map(([name, methods]) => ({
-          name,
-          methods,
-        })),
-      }))
-      .sort((a, b) => a.versionName.localeCompare(b.versionName, "nl", { sensitivity: "base" }));
-
-    encounterCache.set(url, formatted);
-    return formatted;
-  } catch (error) {
-    console.warn(`Kon encounters van '${url}' niet laden:`, error);
-    encounterCache.set(url, []);
-    return [];
-  }
 }
 
 function extractTypesFromPokemon(pokemonData) {
@@ -2422,8 +2230,8 @@ async function getPokemonDetails(entry) {
     versions: versionSprites,
   };
 
-  const encounterUrl = pokemonData.location_area_encounters || null;
-  const encounters = encounterUrl ? await fetchEncounterData(encounterUrl) : [];
+  const generation = speciesData?.generation?.name || null;
+  const speciesSlug = speciesData?.name || null;
 
   let evolution = { steps: [] };
   if (speciesData?.evolution_chain?.url) {
@@ -2439,8 +2247,9 @@ async function getPokemonDetails(entry) {
     sprites,
     height,
     weight,
-    encounters,
     evolution,
+    generation,
+    speciesSlug,
   };
 }
 
