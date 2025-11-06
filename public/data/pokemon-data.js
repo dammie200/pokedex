@@ -2425,6 +2425,9 @@ async function getPokemonDetails(entry) {
   const encounterUrl = pokemonData.location_area_encounters || null;
   const encounters = encounterUrl ? await fetchEncounterData(encounterUrl) : [];
 
+  const generation = speciesData?.generation?.name || null;
+  const speciesSlug = speciesData?.name || null;
+
   let evolution = { steps: [] };
   if (speciesData?.evolution_chain?.url) {
     const chainData = await fetchEvolutionChainData(speciesData.evolution_chain.url);
@@ -2441,6 +2444,8 @@ async function getPokemonDetails(entry) {
     weight,
     encounters,
     evolution,
+    generation,
+    speciesSlug,
   };
 }
 
