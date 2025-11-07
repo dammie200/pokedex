@@ -191,6 +191,11 @@
             </div>
             <span class="pokemon-name" role="button" tabindex="0"></span>
             <div class="pokemon-types"></div>
+            <div
+              class="pokemon-marks"
+              role="group"
+              aria-label="Speciale markeringen"
+            ></div>
           </div>
         </div>
       </button>
@@ -205,6 +210,11 @@
         </span>
         <span class="dex-list__cell dex-list__cell--types"></span>
         <span class="dex-list__cell dex-list__cell--status">
+          <div
+            class="pokemon-marks"
+            role="group"
+            aria-label="Speciale markeringen"
+          ></div>
           <button type="button" class="status-toggle">Markeer</button>
         </span>
       </div>
@@ -246,19 +256,20 @@
                 <dd id="pokemon-detail-weight">-</dd>
               </div>
             </dl>
+            <div id="pokemon-detail-links" class="pokemon-details__links" hidden></div>
           </div>
         </header>
         <section class="pokemon-details__section">
-          <h3>Beschikbaar in</h3>
-          <div id="pokemon-detail-games" class="pokemon-details__games"></div>
-        </section>
-        <section class="pokemon-details__section">
-          <h3>Vanglocaties</h3>
-          <div id="pokemon-detail-encounters" class="pokemon-details__encounters"></div>
-        </section>
-        <section class="pokemon-details__section">
           <h3>Evolutie</h3>
           <div id="pokemon-detail-evolution" class="pokemon-details__evolution"></div>
+        </section>
+        <section class="pokemon-details__section">
+          <h3>Status</h3>
+          <div id="pokemon-detail-marks" class="pokemon-details__marks"></div>
+        </section>
+        <section class="pokemon-details__section">
+          <h3>Varianten</h3>
+          <div id="pokemon-detail-variants" class="pokemon-details__variants"></div>
         </section>
       </div>
     </dialog>
