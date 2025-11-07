@@ -2,6 +2,7 @@
 const BOX_SIZE = 30;
 const STORAGE_KEY = "living-dex-state-v2";
 const LEGACY_STORAGE_KEYS = ["living-dex-state-v1"];
+const MARK_STORAGE_KEY = "living-dex-marks-v1";
 
 const dom = {
   gameSelect: document.getElementById("game-select"),
@@ -44,9 +45,10 @@ const dom = {
   detailSprite: document.getElementById("pokemon-detail-sprite"),
   detailHeight: document.getElementById("pokemon-detail-height"),
   detailWeight: document.getElementById("pokemon-detail-weight"),
-  detailGames: document.getElementById("pokemon-detail-games"),
-  detailEncounters: document.getElementById("pokemon-detail-encounters"),
+  detailLinks: document.getElementById("pokemon-detail-links"),
   detailEvolution: document.getElementById("pokemon-detail-evolution"),
+  detailMarks: document.getElementById("pokemon-detail-marks"),
+  detailVariants: document.getElementById("pokemon-detail-variants"),
 };
 
 const state = {
@@ -63,9 +65,11 @@ const state = {
     search: "",
   },
   caughtByGame: {},
+  marksByGame: {},
   selectedDexByGame: {},
   variantsBySpecies: { mega: {}, gmax: {} },
   variantDefinitionMap: new Map(),
+  allVariantsBySpecies: new Map(),
 };
 
 const TYPE_COLORS = {
@@ -113,6 +117,63 @@ const VERSION_NAME_OVERRIDES = {
 const SPECIAL_FORM_METADATA = {
   mega: { symbol: "M", className: "special-icon--mega", label: "Mega evolutie" },
   gmax: { symbol: "G", className: "special-icon--gmax", label: "Gigantamax" },
+};
+
+const MARK_TYPES = ["shiny", "gmax", "mega", "alpha"];
+
+const MARK_LABELS = {
+  shiny: "Shiny",
+  gmax: "G-Max",
+  mega: "Mega",
+  alpha: "Alpha",
+};
+
+const MARK_SYMBOLS = {
+  shiny: "✧",
+  mega: "M",
+  gmax: "G",
+  alpha: "α",
+};
+
+const SEREBII_BASE_URL = "https://www.serebii.net";
+const BULBAPEDIA_BASE_URL = "https://bulbapedia.bulbagarden.net/wiki/";
+
+const SEREBII_GENERATION_PATHS = {
+  "generation-i": { path: "pokedex", useSlug: false },
+  "generation-ii": { path: "pokedex-gs", useSlug: false },
+  "generation-iii": { path: "pokedex-rs", useSlug: false },
+  "generation-iv": { path: "pokedex-dp", useSlug: false },
+  "generation-v": { path: "pokedex-bw", useSlug: false },
+  "generation-vi": { path: "pokedex-xy", useSlug: false },
+  "generation-vii": { path: "pokedex-sm", useSlug: false },
+  "generation-viii": { path: "pokedex-swsh", useSlug: true },
+  "generation-ix": { path: "pokedex-sv", useSlug: true },
+};
+
+const ALPHA_GAME_IDS = new Set(["legends-arceus", "legends-za"]);
+
+const GMAX_GAME_IDS = new Set(["sword-shield", "pokemon-home"]);
+
+const MEGA_GAME_IDS = new Set([
+  "x-y",
+  "omega-ruby-alpha-sapphire",
+  "sun-moon",
+  "ultra-sun-moon",
+  "lets-go",
+  "legends-za",
+  "pokemon-home",
+]);
+
+const VARIANT_CATEGORY_LABELS = {
+  regional: "Regionaal",
+  mega: "Mega",
+  gmax: "G-Max",
+};
+
+const VARIANT_CATEGORY_ORDER = {
+  regional: 0,
+  mega: 1,
+  gmax: 2,
 };
 
 const VERSION_RELEASE_ORDER = [
@@ -163,6 +224,61 @@ const VERSION_RELEASE_ORDER = [
 const VERSION_ORDER_MAP = new Map(
   VERSION_RELEASE_ORDER.map((slug, index) => [slug, index])
 );
+
+const VERSION_TO_GAME = new Map([
+  ["red", { gameId: "red-blue-yellow", gameName: "Red, Blue & Yellow" }],
+  ["blue", { gameId: "red-blue-yellow", gameName: "Red, Blue & Yellow" }],
+  ["yellow", { gameId: "red-blue-yellow", gameName: "Red, Blue & Yellow" }],
+  ["gold", { gameId: "gold-silver-crystal", gameName: "Gold, Silver & Crystal" }],
+  ["silver", { gameId: "gold-silver-crystal", gameName: "Gold, Silver & Crystal" }],
+  ["crystal", { gameId: "gold-silver-crystal", gameName: "Gold, Silver & Crystal" }],
+  ["ruby", { gameId: "ruby-sapphire", gameName: "Ruby & Sapphire" }],
+  ["sapphire", { gameId: "ruby-sapphire", gameName: "Ruby & Sapphire" }],
+  ["emerald", { gameId: "emerald", gameName: "Emerald" }],
+  ["fire-red", { gameId: "firered-leafgreen", gameName: "FireRed & LeafGreen" }],
+  ["leaf-green", { gameId: "firered-leafgreen", gameName: "FireRed & LeafGreen" }],
+  ["diamond", { gameId: "diamond-pearl", gameName: "Diamond & Pearl" }],
+  ["pearl", { gameId: "diamond-pearl", gameName: "Diamond & Pearl" }],
+  ["platinum", { gameId: "platinum", gameName: "Platinum" }],
+  ["heartgold", { gameId: "heartgold-soulsilver", gameName: "HeartGold & SoulSilver" }],
+  ["soulsilver", { gameId: "heartgold-soulsilver", gameName: "HeartGold & SoulSilver" }],
+  ["black", { gameId: "black-white", gameName: "Black & White" }],
+  ["white", { gameId: "black-white", gameName: "Black & White" }],
+  ["black-2", { gameId: "black-2-white-2", gameName: "Black 2 & White 2" }],
+  ["white-2", { gameId: "black-2-white-2", gameName: "Black 2 & White 2" }],
+  ["x", { gameId: "x-y", gameName: "X & Y" }],
+  ["y", { gameId: "x-y", gameName: "X & Y" }],
+  ["omega-ruby", { gameId: "omega-ruby-alpha-sapphire", gameName: "Omega Ruby & Alpha Sapphire" }],
+  ["alpha-sapphire", { gameId: "omega-ruby-alpha-sapphire", gameName: "Omega Ruby & Alpha Sapphire" }],
+  ["sun", { gameId: "sun-moon", gameName: "Sun & Moon" }],
+  ["moon", { gameId: "sun-moon", gameName: "Sun & Moon" }],
+  ["ultra-sun", { gameId: "ultra-sun-moon", gameName: "Ultra Sun & Ultra Moon" }],
+  ["ultra-moon", { gameId: "ultra-sun-moon", gameName: "Ultra Sun & Ultra Moon" }],
+  ["lets-go-pikachu", { gameId: "lets-go", gameName: "Let's Go Pikachu & Eevee" }],
+  ["lets-go-eevee", { gameId: "lets-go", gameName: "Let's Go Pikachu & Eevee" }],
+  ["sword", { gameId: "sword-shield", gameName: "Sword & Shield" }],
+  ["shield", { gameId: "sword-shield", gameName: "Sword & Shield" }],
+  ["isle-of-armor", { gameId: "sword-shield", gameName: "Sword & Shield" }],
+  ["crown-tundra", { gameId: "sword-shield", gameName: "Sword & Shield" }],
+  ["brilliant-diamond", { gameId: "brilliant-diamond-pearl", gameName: "Brilliant Diamond & Shining Pearl" }],
+  ["shining-pearl", { gameId: "brilliant-diamond-pearl", gameName: "Brilliant Diamond & Shining Pearl" }],
+  ["legends-arceus", { gameId: "legends-arceus", gameName: "Legends Arceus" }],
+  ["scarlet", { gameId: "scarlet-violet", gameName: "Scarlet & Violet" }],
+  ["violet", { gameId: "scarlet-violet", gameName: "Scarlet & Violet" }],
+  ["teal-mask", { gameId: "scarlet-violet", gameName: "Scarlet & Violet" }],
+  ["indigo-disk", { gameId: "scarlet-violet", gameName: "Scarlet & Violet" }],
+  ["home", { gameId: "pokemon-home", gameName: "Pokémon HOME" }],
+]);
+
+const GAME_RELEASE_ORDER_MAP = new Map();
+VERSION_RELEASE_ORDER.forEach((version, index) => {
+  const group = VERSION_TO_GAME.get(version);
+  if (!group) return;
+  const existing = GAME_RELEASE_ORDER_MAP.get(group.gameId);
+  if (existing === undefined || index < existing) {
+    GAME_RELEASE_ORDER_MAP.set(group.gameId, index);
+  }
+});
 
 const VIEW_MODES = {
   GRID: "grid",
@@ -227,147 +343,12 @@ const NOSTALGIA_VERSION_BY_GAME = {
   "red-blue-yellow": "red-blue",
 };
 
-const FALLBACK_ENCOUNTERS_BY_DEX = {
-  paldea: [
-    {
-      version: "scarlet",
-      versionName: "Scarlet",
-      locations: [
-        { name: "South Province (Areas One–Six)", methods: ["Overworld"] },
-        { name: "West & North Province", methods: ["Habitat verkenning"] },
-        { name: "Area Zero", methods: ["Late-game overworld"] },
-        { name: "Tera Raid Dens", methods: ["Tera Raids"] },
-      ],
-    },
-    {
-      version: "violet",
-      versionName: "Violet",
-      locations: [
-        { name: "South Province (Areas One–Six)", methods: ["Overworld"] },
-        { name: "Area Zero", methods: ["Late-game overworld"] },
-        { name: "Tera Raid Dens", methods: ["Tera Raids"] },
-      ],
-    },
-  ],
-  kitakami: [
-    {
-      version: "teal-mask",
-      versionName: "Teal Mask",
-      locations: [
-        { name: "Kitakami Road & Mossfell Confluence", methods: ["Overworld"] },
-        { name: "Timeless Woods", methods: ["Nacht spawns & events"] },
-        { name: "Crystal Pool", methods: ["Speciale ontmoetingen"] },
-      ],
-    },
-  ],
-  blueberry: [
-    {
-      version: "indigo-disk",
-      versionName: "Indigo Disk",
-      locations: [
-        { name: "Savanna & Coastal Biome", methods: ["Blueberry Biome overworld"] },
-        { name: "Canyon & Polar Biome", methods: ["Blueberry Biome overworld"] },
-        { name: "BB Quests", methods: ["Blueberry Quests beloningen"] },
-      ],
-    },
-  ],
-  "scarlet-violet-other": [
-    {
-      version: "scarlet",
-      versionName: "Scarlet",
-      locations: [
-        { name: "Tera Raid Dens", methods: ["5★-7★ evenementen"] },
-        { name: "Blueberry Academy", methods: ["BB Quests en legendarische excursies"] },
-      ],
-    },
-    {
-      version: "violet",
-      versionName: "Violet",
-      locations: [
-        { name: "Tera Raid Dens", methods: ["5★-7★ evenementen"] },
-        { name: "Blueberry Academy", methods: ["BB Quests en legendarische excursies"] },
-      ],
-    },
-  ],
-  galar: [
-    {
-      version: "sword",
-      versionName: "Sword",
-      locations: [
-        { name: "Wild Area", methods: ["Overworld", "Max Raid Battles"] },
-        { name: "Routes & Cities", methods: ["Grasvelden", "Fishing"] },
-      ],
-    },
-    {
-      version: "shield",
-      versionName: "Shield",
-      locations: [
-        { name: "Wild Area", methods: ["Overworld", "Max Raid Battles"] },
-        { name: "Routes & Cities", methods: ["Grasvelden", "Fishing"] },
-      ],
-    },
-  ],
-  "isle-of-armor": [
-    {
-      version: "isle-of-armor",
-      versionName: "Isle of Armor",
-      locations: [
-        { name: "Fields of Honor & Soothing Wetlands", methods: ["Overworld"] },
-        { name: "Courageous Cavern", methods: ["Grotten"] },
-        { name: "Max Raid Dens", methods: ["Dynamax Raids"] },
-      ],
-    },
-  ],
-  "crown-tundra": [
-    {
-      version: "crown-tundra",
-      versionName: "Crown Tundra",
-      locations: [
-        { name: "Slippery Slope & Giant's Bed", methods: ["Overworld"] },
-        { name: "Max Lair", methods: ["Dynamax Adventures"] },
-        { name: "Crown Shrine", methods: ["Verhaal evenementen"] },
-      ],
-    },
-  ],
-  "sword-shield-other": [
-    {
-      version: "crown-tundra",
-      versionName: "Crown Tundra",
-      locations: [
-        { name: "Max Lair", methods: ["Dynamax Adventures (legendaries)"] },
-      ],
-    },
-    {
-      version: "sword",
-      versionName: "Sword",
-      locations: [
-        { name: "Mystery Gift", methods: ["Evenementen & transfers"] },
-      ],
-    },
-    {
-      version: "shield",
-      versionName: "Shield",
-      locations: [
-        { name: "Mystery Gift", methods: ["Evenementen & transfers"] },
-      ],
-    },
-  ],
-  hisui: [
-    {
-      version: "legends-arceus",
-      versionName: "Legends Arceus",
-      locations: [
-        { name: "Obsidian Fieldlands", methods: ["Verkenning & Mass Outbreaks"] },
-        { name: "Crimson Mirelands", methods: ["Ruimtijdverstoringen"] },
-        { name: "Coronet Highlands / Alabaster Icelands", methods: ["Postgame"] },
-      ],
-    },
-  ],
-};
+
 
 const pokemonDetailsCache = new Map();
 const pendingDetailRequests = new Map();
 let lastFocusedElement = null;
+let activeDetailEntry = null;
 
 const DEX_SELECTION_STORAGE_KEY = `${STORAGE_KEY}:dex-selection`;
 
@@ -439,6 +420,14 @@ function getVersionOrder(version) {
   return Number.MAX_SAFE_INTEGER;
 }
 
+function getGameOrder(gameId) {
+  if (!gameId) return Number.MAX_SAFE_INTEGER;
+  if (GAME_RELEASE_ORDER_MAP.has(gameId)) {
+    return GAME_RELEASE_ORDER_MAP.get(gameId);
+  }
+  return Number.MAX_SAFE_INTEGER;
+}
+
 function buildVariantDefinitionMap(definitions = []) {
   const map = new Map();
   definitions.forEach((variant) => {
@@ -459,6 +448,57 @@ function getCaughtSet(gameId) {
     state.caughtByGame[gameId] = new Set();
   }
   return state.caughtByGame[gameId];
+}
+
+function ensureMarkStorage(gameId) {
+  if (!gameId) return null;
+  if (!state.marksByGame[gameId]) {
+    state.marksByGame[gameId] = {};
+  }
+  const storage = state.marksByGame[gameId];
+  MARK_TYPES.forEach((type) => {
+    if (storage[type] instanceof Set) return;
+    if (Array.isArray(storage[type])) {
+      storage[type] = new Set(storage[type].map((value) => String(value)));
+      return;
+    }
+    if (storage[type] && typeof storage[type][Symbol.iterator] === "function") {
+      storage[type] = new Set(Array.from(storage[type], (value) => String(value)));
+      return;
+    }
+    storage[type] = new Set();
+  });
+  return storage;
+}
+
+function getMarkSet(gameId, markType) {
+  if (!gameId || !MARK_TYPES.includes(markType)) return new Set();
+  const storage = ensureMarkStorage(gameId);
+  if (!storage) return new Set();
+  return storage[markType];
+}
+
+function isEntryMarked(entry, markType, gameId = state.currentGameId) {
+  if (!entry || !markType || !gameId) return false;
+  const key = getEntryCatchKey(entry);
+  if (!key) return false;
+  const set = getMarkSet(gameId, markType);
+  return set.has(String(key));
+}
+
+function setEntryMark(entry, markType, shouldMark, gameId = state.currentGameId) {
+  if (!entry || !markType || !gameId) return;
+  const key = getEntryCatchKey(entry);
+  if (!key) return;
+  const set = getMarkSet(gameId, markType);
+  const normalized = String(key);
+  if (shouldMark) {
+    set.add(normalized);
+  } else {
+    set.delete(normalized);
+  }
+  persistMarkState();
+  refreshEntryMarks(entry);
 }
 
 function getCurrentGame() {
@@ -743,11 +783,16 @@ function resolveSprite(entry, details, options = {}) {
   return "";
 }
 
-function getSpriteForEntry(entry, details) {
+function getSpriteForEntry(entry, details, options = {}) {
   if (!entry) return "";
-  if (state.spriteMode === "mega" || state.spriteMode === "gmax") {
+  const mode = options.mode || state.spriteMode || "default";
+  const normalizedMode = mode === "detail" ? "default" : mode;
+  const preferHome = Boolean(options.preferHome);
+  const preferEntry = options.preferEntry !== false;
+  const gameId = options.gameId || state.currentGameId;
+  if (normalizedMode === "mega" || normalizedMode === "gmax") {
     const forms = getSpecialFormsForSpecies(entry.speciesId);
-    const match = forms.find((form) => form.type === state.spriteMode);
+    const match = forms.find((form) => form.type === normalizedMode);
     if (match?.variant) {
       const variantSprite = getVariantSprite(match.variant);
       if (variantSprite) {
@@ -755,18 +800,20 @@ function getSpriteForEntry(entry, details) {
       }
     }
   }
-  if (state.spriteMode === "shiny") {
-    if (details?.sprites?.shiny) {
-      return details.sprites.shiny;
+  const detailsData = details || getCachedPokemonDetails(entry);
+  const shinyMarked = isEntryMarked(entry, "shiny", gameId);
+  if (normalizedMode === "shiny" || (normalizedMode === "default" && shinyMarked)) {
+    if (detailsData?.sprites?.shiny) {
+      return detailsData.sprites.shiny;
     }
   }
-  if (state.spriteMode === "nostalgia") {
-    const nostalgic = getNostalgiaSprite(entry, details);
+  if (normalizedMode === "nostalgia") {
+    const nostalgic = getNostalgiaSprite(entry, detailsData);
     if (nostalgic) {
       return nostalgic;
     }
   }
-  return resolveSprite(entry, details, { preferHome: false, preferEntry: true });
+  return resolveSprite(entry, detailsData, { preferHome, preferEntry });
 }
 
 function getSpecialFormsForSpecies(speciesId) {
@@ -777,6 +824,40 @@ function getSpecialFormsForSpecies(speciesId) {
   const gmax = state.variantsBySpecies?.gmax?.[id] || [];
   gmax.forEach((variant) => results.push({ type: "gmax", variant }));
   return results;
+}
+
+function groupVariantsBySpeciesList(variants = []) {
+  const map = new Map();
+  variants.forEach((variant) => {
+    if (!variant || !variant.speciesId) return;
+    const key = String(variant.speciesId);
+    const existing = map.get(key) || [];
+    existing.push({ ...variant });
+    map.set(key, existing);
+  });
+  map.forEach((list) => {
+    list.sort((a, b) => {
+      const aCategory = VARIANT_CATEGORY_ORDER[a.category] ?? Number.MAX_SAFE_INTEGER;
+      const bCategory = VARIANT_CATEGORY_ORDER[b.category] ?? Number.MAX_SAFE_INTEGER;
+      if (aCategory !== bCategory) {
+        return aCategory - bCategory;
+      }
+      if (a.form && b.form && a.form !== b.form) {
+        return a.form.localeCompare(b.form);
+      }
+      return (a.name || "").localeCompare(b.name || "", "nl", {
+        sensitivity: "base",
+      });
+    });
+  });
+  return map;
+}
+
+function getAllVariantsForSpecies(speciesId) {
+  if (!speciesId) return [];
+  const key = String(speciesId);
+  const list = state.allVariantsBySpecies?.get?.(key);
+  return Array.isArray(list) ? list : [];
 }
 
 function getVariantSprite(variant) {
@@ -833,6 +914,102 @@ function getNostalgiaSprite(entry, details) {
 function findVariantDefinition(speciesId, form) {
   if (!form) return null;
   return state.variantDefinitionMap.get(`${Number(speciesId)}:${form}`) || null;
+}
+
+function resolveSpeciesSlug(details, entry) {
+  const variant = findVariantDefinition(entry?.speciesId, entry?.form);
+  const candidates = [
+    details?.speciesSlug,
+    variant?.formSlug,
+    variant?.pokemonSlug,
+    entry?.variantFormSlug,
+    entry?.pokemonSlug,
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim().toLowerCase();
+    }
+  }
+
+  const fallback = details?.name || entry?.name;
+  if (!fallback) return null;
+  return fallback
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9-]/g, "");
+}
+
+function getSerebiiUrl(details, entry) {
+  if (!details || !entry) return null;
+  const generationKey = details.generation || null;
+  const meta = generationKey ? SEREBII_GENERATION_PATHS[generationKey] : null;
+  const speciesId = Number(entry.speciesId);
+  const paddedId = Number.isFinite(speciesId)
+    ? String(speciesId).padStart(3, "0")
+    : null;
+
+  if (!meta) {
+    return paddedId ? `${SEREBII_BASE_URL}/pokedex/${paddedId}.shtml` : null;
+  }
+
+  if (meta.useSlug) {
+    const slug = resolveSpeciesSlug(details, entry);
+    if (!slug) return null;
+    return `${SEREBII_BASE_URL}/${meta.path}/${slug}/`;
+  }
+
+  if (!paddedId) return null;
+  return `${SEREBII_BASE_URL}/${meta.path}/${paddedId}.shtml`;
+}
+
+function getBulbapediaUrl(details, entry) {
+  const name = details?.name || entry?.name;
+  if (!name) return null;
+  const article = `${name.replace(/\s+/g, "_")}_(Pokémon)`;
+  return `${BULBAPEDIA_BASE_URL}${encodeURI(article)}`;
+}
+
+function createExternalLink(label, url) {
+  if (!label || !url) return null;
+  const link = document.createElement("a");
+  link.className = "pokemon-details__link";
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noreferrer noopener";
+  link.textContent = label;
+  link.setAttribute("aria-label", `${label} — opent in een nieuw venster`);
+  return link;
+}
+
+function renderExternalLinks(container, details, entry) {
+  if (!container) return;
+  container.innerHTML = "";
+  const links = [];
+
+  const serebiiUrl = getSerebiiUrl(details, entry);
+  if (serebiiUrl) {
+    links.push({ label: "Serebii", url: serebiiUrl });
+  }
+
+  const bulbapediaUrl = getBulbapediaUrl(details, entry);
+  if (bulbapediaUrl) {
+    links.push({ label: "Bulbapedia", url: bulbapediaUrl });
+  }
+
+  if (!links.length) {
+    container.hidden = true;
+    return;
+  }
+
+  links.forEach((entryLink) => {
+    const linkNode = createExternalLink(entryLink.label, entryLink.url);
+    if (linkNode) {
+      container.append(linkNode);
+    }
+  });
+  container.hidden = false;
 }
 
 function applyRegionToDisplayNumber(display, regionCode) {
@@ -955,6 +1132,7 @@ function renderGrid(entries, caughtSet) {
     const name = card.querySelector(".pokemon-name");
     const special = card.querySelector(".pokemon-special");
     const typesContainer = card.querySelector(".pokemon-types");
+    const marksContainer = card.querySelector(".pokemon-marks");
 
     if (number) {
       number.textContent = entry.displayNumber || "";
@@ -989,11 +1167,14 @@ function renderGrid(entries, caughtSet) {
 
     renderTypeBadges(typesContainer, entry.types || cachedDetails?.types || []);
     appendSpecialForms(special, entry);
+    renderEntryMarks(marksContainer, entry);
 
     const catchKey = getEntryCatchKey(entry);
     const isCaught = catchKey ? caughtSet.has(String(catchKey)) : false;
     card.dataset.id = catchKey || "";
     card.dataset.caught = String(isCaught);
+    const highlight = shouldHighlightHome(caughtSet, catchKey);
+    card.classList.toggle("pokemon-card--other-caught", highlight);
     const detailKey = getEntryDetailKey(entry);
     if (detailKey) {
       card.dataset.entryKey = detailKey;
@@ -1059,6 +1240,9 @@ function createListRow(entry, caughtSet) {
   const specialContainer = node.querySelector(".pokemon-special");
   appendSpecialForms(specialContainer, entry);
 
+  const marksContainer = node.querySelector(".pokemon-marks");
+  renderEntryMarks(marksContainer, entry);
+
   const statusButton = node.querySelector(".status-toggle");
   if (statusButton) {
     statusButton.addEventListener("click", (event) => {
@@ -1069,6 +1253,8 @@ function createListRow(entry, caughtSet) {
 
   const isCaught = catchKey ? caughtSet.has(String(catchKey)) : false;
   node.dataset.caught = String(isCaught);
+  const highlight = shouldHighlightHome(caughtSet, catchKey);
+  node.classList.toggle("dex-list__row--other-caught", highlight);
   if (statusButton) {
     statusButton.textContent = isCaught
       ? "Verwijder markering"
@@ -1110,6 +1296,8 @@ function updateListRow(catchKey) {
   const caughtSet = getCaughtSet(state.currentGameId);
   const isCaught = caughtSet.has(String(catchKey));
   row.dataset.caught = String(isCaught);
+  const highlight = shouldHighlightHome(caughtSet, catchKey);
+  row.classList.toggle("dex-list__row--other-caught", highlight);
   const button = row.querySelector(".status-toggle");
   if (button) {
     button.textContent = isCaught
@@ -1126,6 +1314,8 @@ function updateCard(catchKey) {
   if (!card) return;
   const caughtSet = getCaughtSet(state.currentGameId);
   card.dataset.caught = String(caughtSet.has(String(catchKey)));
+  const highlight = shouldHighlightHome(caughtSet, catchKey);
+  card.classList.toggle("pokemon-card--other-caught", highlight);
 }
 
 function updateEntryStatus(catchKey) {
@@ -1149,6 +1339,24 @@ function toggleCaught(catchKey) {
   } else {
     renderDex();
   }
+}
+
+function isCaughtInOtherGames(catchKey, currentGameId = state.currentGameId) {
+  if (!catchKey) return false;
+  const normalized = String(catchKey);
+  return Object.entries(state.caughtByGame).some(([gameId, idSet]) => {
+    if (gameId === currentGameId) return false;
+    if (!(idSet instanceof Set)) return false;
+    return idSet.has(normalized);
+  });
+}
+
+function shouldHighlightHome(caughtSet, catchKey) {
+  if (state.currentGameId !== "pokemon-home") return false;
+  if (!catchKey) return false;
+  const normalized = String(catchKey);
+  if (caughtSet?.has?.(normalized)) return false;
+  return isCaughtInOtherGames(normalized, state.currentGameId);
 }
 
 function markEntries(entries, shouldMark) {
@@ -1375,112 +1583,354 @@ function jumpToBox(boxNumber) {
   }
 }
 
-function sortEncounterEntries(encounters = []) {
-  return encounters
-    .slice()
-    .sort((a, b) => {
-      const order =
-        getVersionOrder(a.version || a.versionName) -
-        getVersionOrder(b.version || b.versionName);
-      if (order !== 0) return order;
-      const nameA = normalizeVersionSlug(a.version || a.versionName);
-      const nameB = normalizeVersionSlug(b.version || b.versionName);
-      return nameA.localeCompare(nameB);
-    });
+function currentGameSupportsMega(gameId = state.currentGameId) {
+  if (!gameId) return false;
+  return MEGA_GAME_IDS.has(gameId);
 }
 
-function renderAvailability(container, availability = []) {
+function currentGameSupportsGmax(gameId = state.currentGameId) {
+  if (!gameId) return false;
+  return GMAX_GAME_IDS.has(gameId);
+}
+
+function currentGameSupportsAlpha(gameId = state.currentGameId) {
+  if (!gameId) return false;
+  return ALPHA_GAME_IDS.has(gameId);
+}
+
+function getAvailableMarks(entry) {
+  if (!entry) return [];
+  const marks = new Set();
+  marks.add("shiny");
+  const forms = getSpecialFormsForSpecies(entry.speciesId);
+  if (currentGameSupportsGmax() && forms.some((form) => form.type === "gmax")) {
+    marks.add("gmax");
+  }
+  if (currentGameSupportsMega() && forms.some((form) => form.type === "mega")) {
+    marks.add("mega");
+  }
+  if (currentGameSupportsAlpha()) {
+    marks.add("alpha");
+  }
+  return Array.from(marks).filter((mark) => MARK_TYPES.includes(mark));
+}
+
+function renderDetailMarks(container, entry) {
   if (!container) return;
   container.innerHTML = "";
-  if (!Array.isArray(availability) || !availability.length) {
+  const marks = getAvailableMarks(entry);
+  if (!marks.length) {
     const empty = document.createElement("p");
     empty.className = "pokemon-details__empty";
-    empty.textContent = "Geen koppelingen met geselecteerde games.";
+    empty.textContent = "Geen markeringen beschikbaar.";
     container.append(empty);
     return;
   }
 
-  availability.forEach((entry) => {
+  marks.forEach((mark) => {
     const wrapper = document.createElement("div");
-    wrapper.className = "pokemon-details__game";
-    const title = document.createElement("p");
-    title.className = "pokemon-details__game-title";
-    title.textContent = entry.gameName;
-    wrapper.append(title);
+    wrapper.className = "pokemon-details__mark-status";
+    const symbol = document.createElement("span");
+    symbol.className = "pokemon-details__mark-symbol";
+    symbol.textContent = MARK_SYMBOLS[mark] || mark.toUpperCase();
+    wrapper.append(symbol);
 
-    const list = document.createElement("ul");
-    list.className = "pokemon-details__dexes";
-    entry.dexes.forEach((dex) => {
-      const item = document.createElement("li");
-      item.textContent = dex.number ? `${dex.name} — ${dex.number}` : dex.name;
-      list.append(item);
-    });
-    wrapper.append(list);
+    const textNode = document.createElement("span");
+    textNode.className = "pokemon-details__mark-text";
+    const active = isEntryMarked(entry, mark);
+    textNode.textContent = `${MARK_LABELS[mark] || mark}: ${active ? "Ja" : "Nee"}`;
+    wrapper.append(textNode);
+    wrapper.dataset.active = String(active);
+    wrapper.classList.toggle("is-active", active);
+
     container.append(wrapper);
   });
 }
 
-function renderEncounters(container, encounters = []) {
+function createMarkToggle(entry, mark) {
+  if (!entry || !mark) return null;
+  const entryKey = getEntryCatchKey(entry);
+  if (!entryKey) return null;
+  const label = document.createElement("label");
+  label.className = "mark-toggle";
+  label.title = MARK_LABELS[mark] || mark;
+
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.className = "mark-toggle__input";
+  input.dataset.mark = mark;
+  input.dataset.entryKey = entryKey;
+  input.checked = isEntryMarked(entry, mark);
+  input.setAttribute("aria-label", MARK_LABELS[mark] || mark);
+  input.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+
+  label.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+  label.addEventListener("keydown", (event) => {
+    event.stopPropagation();
+  });
+
+  label.append(input);
+
+  const symbol = document.createElement("span");
+  symbol.className = "mark-toggle__symbol";
+  symbol.textContent = MARK_SYMBOLS[mark] || mark.toUpperCase();
+  label.append(symbol);
+
+  const srText = document.createElement("span");
+  srText.className = "sr-only";
+  srText.textContent = MARK_LABELS[mark] || mark;
+  label.append(srText);
+
+  return label;
+}
+
+function renderEntryMarks(container, entry) {
   if (!container) return;
   container.innerHTML = "";
-  const sorted = sortEncounterEntries(encounters);
-  if (!sorted.length) {
+  const marks = getAvailableMarks(entry);
+  if (!marks.length) {
+    container.hidden = true;
+    return;
+  }
+  container.hidden = false;
+  marks.forEach((mark) => {
+    const toggle = createMarkToggle(entry, mark);
+    if (toggle) {
+      container.append(toggle);
+    }
+  });
+}
+
+function findEntryByCatchKey(catchKey) {
+  if (!catchKey) return null;
+  const currentDex = getCurrentDex();
+  if (!currentDex || !Array.isArray(currentDex.entries)) return null;
+  const normalized = String(catchKey);
+  return (
+    currentDex.entries.find((entry) => String(getEntryCatchKey(entry)) === normalized) || null
+  );
+}
+
+function updateEntrySprite(entry, details) {
+  if (!entry) return;
+  const catchKey = getEntryCatchKey(entry);
+  if (!catchKey) return;
+  const selector = escapeSelector(catchKey);
+  const card = dom.dexGrid?.querySelector(`.pokemon-card[data-id="${selector}"]`);
+  const cardSprite = card?.querySelector?.(".pokemon-sprite");
+  const data = details || getCachedPokemonDetails(entry);
+  if (cardSprite) {
+    const nextSprite = getSpriteForEntry(entry, data, { preferEntry: true });
+    if (nextSprite) {
+      cardSprite.src = nextSprite;
+      cardSprite.dataset.mode = state.spriteMode;
+    }
+  }
+  if (dom.detailSprite && activeDetailEntry) {
+    const activeKey = getEntryCatchKey(activeDetailEntry);
+    if (activeKey && activeKey === catchKey) {
+      const detailData = data || getCachedPokemonDetails(activeDetailEntry);
+      const detailSprite = getSpriteForEntry(activeDetailEntry, detailData, {
+        mode: "detail",
+        preferHome: true,
+        preferEntry: false,
+      });
+      if (detailSprite) {
+        dom.detailSprite.src = detailSprite;
+      }
+    }
+  }
+}
+
+function refreshEntryMarks(entryOrKey) {
+  const entry =
+    entryOrKey && typeof entryOrKey === "object"
+      ? entryOrKey
+      : findEntryByCatchKey(entryOrKey);
+  if (!entry) return;
+  const catchKey = getEntryCatchKey(entry);
+  if (!catchKey) return;
+  const selector = escapeSelector(catchKey);
+  const card = dom.dexGrid?.querySelector(`.pokemon-card[data-id="${selector}"]`);
+  if (card) {
+    const container = card.querySelector(".pokemon-marks");
+    renderEntryMarks(container, entry);
+  }
+  const row = dom.dexListBody?.querySelector(`.dex-list__row[data-id="${selector}"]`);
+  if (row) {
+    const container = row.querySelector(".pokemon-marks");
+    renderEntryMarks(container, entry);
+  }
+  if (dom.detailMarks && activeDetailEntry) {
+    const activeKey = getEntryCatchKey(activeDetailEntry);
+    if (activeKey && activeKey === catchKey) {
+      renderDetailMarks(dom.detailMarks, activeDetailEntry);
+    }
+  }
+  ensurePokemonDetails(entry).then((details) => {
+    updateEntrySprite(entry, details || getCachedPokemonDetails(entry));
+  });
+}
+
+function onMarkToggleChange(event) {
+  const target = event.target;
+  if (!target || !target.matches('input[type="checkbox"][data-mark][data-entry-key]')) {
+    return;
+  }
+  event.stopPropagation();
+  const markType = target.dataset.mark;
+  const entryKey = target.dataset.entryKey;
+  if (!MARK_TYPES.includes(markType)) return;
+  const entry = findEntryByCatchKey(entryKey);
+  if (!entry) {
+    target.checked = false;
+    return;
+  }
+  setEntryMark(entry, markType, target.checked);
+}
+
+function renderEvolutionSpecialForms(container, entry) {
+  if (!container || !entry) return;
+  const forms = getSpecialFormsForSpecies(entry.speciesId).filter((form) =>
+    form.type === "mega" || form.type === "gmax"
+  );
+  if (!forms.length) return;
+
+  const block = document.createElement("div");
+  block.className = "pokemon-details__evolution-special";
+
+  const title = document.createElement("p");
+  title.className = "pokemon-details__evolution-special-title";
+  title.textContent = "Mega & G-Max";
+  block.append(title);
+
+  const list = document.createElement("div");
+  list.className = "pokemon-details__evolution-special-list";
+
+  forms.forEach(({ type, variant }) => {
+    if (!variant) return;
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "pokemon-details__evolution-special-item";
+    item.dataset.type = type;
+
+    const sprite = document.createElement("img");
+    sprite.className = "pokemon-details__evolution-special-sprite";
+    sprite.src = getVariantSprite(variant) || "";
+    sprite.alt = `${variant.name || entry.name} sprite`;
+    sprite.loading = "lazy";
+    item.append(sprite);
+
+    const nameNode = document.createElement("span");
+    nameNode.className = "pokemon-details__evolution-special-name";
+    nameNode.textContent = variant.name || entry.name || "Onbekend";
+    item.append(nameNode);
+
+    const badge = document.createElement("span");
+    badge.className = "pokemon-details__evolution-special-badge";
+    badge.textContent = SPECIAL_FORM_METADATA[type]?.label || type.toUpperCase();
+    item.append(badge);
+
+    item.addEventListener("click", (event) => {
+      event.preventDefault();
+      openVariantDetailsForEntry(entry, variant, type);
+    });
+
+    list.append(item);
+  });
+
+  block.append(list);
+  container.append(block);
+}
+
+function renderVariants(container, entry) {
+  if (!container) return;
+  container.innerHTML = "";
+  if (!entry) {
     const empty = document.createElement("p");
-    empty.className = "pokemon-details__empty";
-    empty.textContent = "Geen bekende vanglocaties.";
+    empty.className = "pokemon-details__variants-empty";
+    empty.textContent = "Geen varianten beschikbaar.";
     container.append(empty);
     return;
   }
 
-  sorted.forEach((entry) => {
-    const details = document.createElement("details");
-    details.className = "pokemon-details__encounter";
+  const currentKey = getEntryCatchKey(entry);
+  const variants = getAllVariantsForSpecies(entry.speciesId).filter((variant) => {
+    if (!variant) return false;
+    const variantKey = variant.form ? `${entry.speciesId}:${variant.form}` : `${entry.speciesId}`;
+    return variantKey !== currentKey;
+  });
 
-    const summary = document.createElement("summary");
-    summary.className = "pokemon-details__encounter-title";
-    summary.textContent = entry.versionName || entry.version || "Onbekende versie";
-    details.append(summary);
+  if (!variants.length) {
+    const empty = document.createElement("p");
+    empty.className = "pokemon-details__variants-empty";
+    empty.textContent = "Geen varianten beschikbaar.";
+    container.append(empty);
+    return;
+  }
 
-    const list = document.createElement("ul");
-    list.className = "pokemon-details__locations";
-    (entry.locations || []).forEach((location) => {
-      const item = document.createElement("li");
-      const methods = (location.methods || []).filter(Boolean).join(" • ");
-      item.textContent = methods
-        ? `${formatLocationName(location.name)} — ${methods}`
-        : formatLocationName(location.name);
-      list.append(item);
+  const list = document.createElement("div");
+  list.className = "pokemon-details__variants-list";
+
+  variants.forEach((variant) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "pokemon-details__variant";
+
+    const sprite = document.createElement("img");
+    sprite.className = "pokemon-details__variant-sprite";
+    sprite.src = getVariantSprite(variant) || "";
+    sprite.alt = `${variant.name || entry.name} sprite`;
+    sprite.loading = "lazy";
+    button.append(sprite);
+
+    const nameNode = document.createElement("span");
+    nameNode.className = "pokemon-details__variant-name";
+    nameNode.textContent = variant.name || entry.name || "Onbekend";
+    button.append(nameNode);
+
+    const category = VARIANT_CATEGORY_LABELS[variant.category] || "Variant";
+    const tag = document.createElement("span");
+    tag.className = "pokemon-details__variant-tag";
+    tag.textContent = category;
+    button.append(tag);
+
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      openVariantDetailsForEntry(entry, variant, variant.category);
     });
 
-    details.append(list);
-    container.append(details);
+    list.append(button);
   });
+
+  container.append(list);
 }
+
 
 function renderEvolution(container, evolution = {}, entry) {
   if (!container) return;
   container.innerHTML = "";
   const steps = Array.isArray(evolution.steps) ? evolution.steps : [];
-  if (!steps.length) {
-    const empty = document.createElement("p");
-    empty.className = "pokemon-details__empty";
-    empty.textContent = "Geen evolutiegegevens beschikbaar.";
-    container.append(empty);
-    return;
-  }
+  let rendered = false;
 
   steps.forEach((step) => {
     const block = document.createElement("div");
     block.className = "pokemon-details__evolution-step";
-    const title = document.createElement("p");
-    title.className = "pokemon-details__encounter-title";
+    const path = document.createElement("div");
+    path.className = "pokemon-details__evolution-path";
 
-    const fromNode = document.createElement(step.from?.isCurrent ? "strong" : "span");
-    fromNode.textContent = step.from?.name || "Onbekend";
-    const toNode = document.createElement(step.to?.isCurrent ? "strong" : "span");
-    toNode.textContent = step.to?.name || "Onbekend";
-    title.append(fromNode, document.createTextNode(" → "), toNode);
-    block.append(title);
+    const fromNode = createEvolutionMonNode(step.from);
+    const arrow = document.createElement("span");
+    arrow.className = "pokemon-details__evolution-arrow";
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.textContent = "→";
+    const toNode = createEvolutionMonNode(step.to);
+    path.append(fromNode, arrow, toNode);
+    block.append(path);
 
     const methods = Array.isArray(step.methods) ? step.methods.filter(Boolean) : [];
     if (methods.length) {
@@ -1495,66 +1945,25 @@ function renderEvolution(container, evolution = {}, entry) {
     }
 
     container.append(block);
-  });
-}
-
-function buildFallbackEncounters(entry, availability) {
-  if (!availability || !availability.length) return [];
-  const results = [];
-  const seen = new Set();
-
-  availability.forEach((gameEntry) => {
-    (gameEntry.dexes || []).forEach((dex) => {
-      const fallback = FALLBACK_ENCOUNTERS_BY_DEX[dex.id];
-      if (!fallback) return;
-      fallback.forEach((encounter) => {
-        const key = `${dex.id}:${encounter.version}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        results.push(encounter);
-      });
-    });
+    rendered = true;
   });
 
-  return results;
+  renderEvolutionSpecialForms(container, entry);
+  if (container.children.length) {
+    rendered = true;
+  }
+
+  if (!rendered) {
+    const empty = document.createElement("p");
+    empty.className = "pokemon-details__empty";
+    empty.textContent = "Geen evolutiegegevens beschikbaar.";
+    container.append(empty);
+  }
 }
 
-function computeAvailability(entry) {
-  const games = getGames();
-  const key = getEntryDetailKey(entry);
-  if (!key || !games.length) return [];
-
-  return games
-    .map((game) => {
-      const dexes = (game.dexes || []).filter((dex) => {
-        if (!Array.isArray(dex.entries)) return false;
-        if (dex.id && dex.id.endsWith("-all")) return false;
-        return dex.entries.some((dexEntry) => dexEntry.key === key);
-      });
-      if (!dexes.length) return null;
-      return {
-        gameId: game.id,
-        gameName: game.name,
-        dexes: dexes.map((dex) => {
-          const entryMatch = dex.entries.find((dexEntry) => dexEntry.key === key);
-          return {
-            id: dex.id,
-            name: dex.name,
-            number:
-              entryMatch?.displayNumber ||
-              entryMatch?.displayNationalNumber ||
-              entryMatch?.displayDexNumber ||
-              entryMatch?.displayNumber ||
-              "",
-          };
-        }),
-      };
-    })
-    .filter(Boolean);
-}
-
-function showPokemonDetailsLoading(entry, availability) {
+function showPokemonDetailsLoading(entry) {
   if (!entry || !dom.detailsDialog) return;
+  activeDetailEntry = entry;
   if (dom.detailName) dom.detailName.textContent = entry.name;
   if (dom.detailNumber) {
     dom.detailNumber.textContent =
@@ -1570,21 +1979,21 @@ function showPokemonDetailsLoading(entry, availability) {
   }
 
   if (dom.detailSprite) {
-    const spriteUrl = resolveSprite(entry, cached, { preferHome: true });
+    const spriteUrl = getSpriteForEntry(entry, cached, {
+      mode: "detail",
+      preferHome: true,
+      preferEntry: false,
+    });
     dom.detailSprite.src = spriteUrl || "";
     dom.detailSprite.alt = `${entry.name} sprite`;
   }
 
   if (dom.detailHeight) dom.detailHeight.textContent = "Laden…";
   if (dom.detailWeight) dom.detailWeight.textContent = "Laden…";
-  renderAvailability(dom.detailGames, availability);
 
-  if (dom.detailEncounters) {
-    dom.detailEncounters.innerHTML = "";
-    const loading = document.createElement("p");
-    loading.className = "pokemon-details__empty";
-    loading.textContent = "Gegevens worden geladen…";
-    dom.detailEncounters.append(loading);
+  if (dom.detailLinks) {
+    dom.detailLinks.innerHTML = "";
+    dom.detailLinks.hidden = true;
   }
 
   if (dom.detailEvolution) {
@@ -1594,9 +2003,17 @@ function showPokemonDetailsLoading(entry, availability) {
     loading.textContent = "Gegevens worden geladen…";
     dom.detailEvolution.append(loading);
   }
+
+  if (dom.detailMarks) {
+    renderDetailMarks(dom.detailMarks, entry);
+  }
+
+  if (dom.detailVariants) {
+    renderVariants(dom.detailVariants, entry);
+  }
 }
 
-function applyPokemonDetails(entry, details, availability) {
+function applyPokemonDetails(entry, details) {
   if (!details) return;
   if (dom.detailName) dom.detailName.textContent = details.name || entry.name;
   if (dom.detailNumber) {
@@ -1608,7 +2025,11 @@ function applyPokemonDetails(entry, details, availability) {
   }
   updateEntryTypes(entry, details.types || entry.types || []);
   if (dom.detailSprite) {
-    const spriteUrl = resolveSprite(entry, details, { preferHome: true });
+    const spriteUrl = getSpriteForEntry(entry, details, {
+      mode: "detail",
+      preferHome: true,
+      preferEntry: false,
+    });
     if (spriteUrl) {
       dom.detailSprite.src = spriteUrl;
     }
@@ -1619,23 +2040,20 @@ function applyPokemonDetails(entry, details, availability) {
   if (dom.detailWeight) {
     dom.detailWeight.textContent = formatWeight(details.weight);
   }
-
-  renderAvailability(dom.detailGames, availability);
-  const manualFallback = buildFallbackEncounters(entry, availability);
-  const encounters = details.encounters && details.encounters.length
-    ? details.encounters
-    : manualFallback;
-  renderEncounters(dom.detailEncounters, encounters);
+  renderExternalLinks(dom.detailLinks, details, entry);
   renderEvolution(dom.detailEvolution, details.evolution || {}, entry);
+  if (dom.detailMarks) {
+    renderDetailMarks(dom.detailMarks, entry);
+  }
+  if (dom.detailVariants) {
+    renderVariants(dom.detailVariants, entry);
+  }
 }
 
 function showPokemonDetailsError(message) {
-  if (dom.detailEncounters) {
-    dom.detailEncounters.innerHTML = "";
-    const error = document.createElement("p");
-    error.className = "pokemon-details__empty";
-    error.textContent = message;
-    dom.detailEncounters.append(error);
+  if (dom.detailLinks) {
+    dom.detailLinks.innerHTML = "";
+    dom.detailLinks.hidden = true;
   }
   if (dom.detailEvolution) {
     dom.detailEvolution.innerHTML = "";
@@ -1650,15 +2068,14 @@ async function openPokemonDetails(entry) {
   if (!entry || !dom.detailsDialog) return;
   lastFocusedElement =
     document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  const availability = computeAvailability(entry);
-  showPokemonDetailsLoading(entry, availability);
+  showPokemonDetailsLoading(entry);
   if (!dom.detailsDialog.open) {
     dom.detailsDialog.showModal();
   }
 
   const cached = getCachedPokemonDetails(entry);
   if (cached) {
-    applyPokemonDetails(entry, cached, availability);
+    applyPokemonDetails(entry, cached);
   }
 
   try {
@@ -1667,7 +2084,7 @@ async function openPokemonDetails(entry) {
       showPokemonDetailsError("Kon details niet laden.");
       return;
     }
-    applyPokemonDetails(entry, details, availability);
+    applyPokemonDetails(entry, details);
   } catch (error) {
     showPokemonDetailsError("Kon details niet laden.");
   }
@@ -1681,6 +2098,7 @@ function closePokemonDetails() {
     lastFocusedElement.focus();
   }
   lastFocusedElement = null;
+  activeDetailEntry = null;
 }
 
 function setupDetailsDialog() {
@@ -1782,8 +2200,29 @@ function loadState() {
         console.warn("Kon dex selectie niet laden:", error);
       }
     }
+    loadMarkState();
   } catch (error) {
     console.warn("Kon lokale data niet laden:", error);
+  }
+}
+
+function loadMarkState() {
+  try {
+    const raw = localStorage.getItem(MARK_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return;
+    state.marksByGame = {};
+    Object.entries(parsed).forEach(([gameId, marks]) => {
+      const storage = {};
+      MARK_TYPES.forEach((type) => {
+        const values = Array.isArray(marks?.[type]) ? marks[type] : [];
+        storage[type] = normalizeStoredIds(values);
+      });
+      state.marksByGame[gameId] = storage;
+    });
+  } catch (error) {
+    console.warn("Kon markeringen niet laden:", error);
   }
 }
 
@@ -1805,6 +2244,26 @@ function persistState() {
     });
   } catch (error) {
     console.warn("Kon voortgang niet opslaan:", error);
+  }
+  persistMarkState();
+}
+
+function persistMarkState() {
+  try {
+    const serializable = Object.fromEntries(
+      Object.entries(state.marksByGame).map(([gameId, marks]) => {
+        const storage = ensureMarkStorage(gameId) || {};
+        const normalized = {};
+        MARK_TYPES.forEach((type) => {
+          const set = storage[type] instanceof Set ? storage[type] : new Set();
+          normalized[type] = Array.from(set.values());
+        });
+        return [gameId, normalized];
+      })
+    );
+    localStorage.setItem(MARK_STORAGE_KEY, JSON.stringify(serializable));
+  } catch (error) {
+    console.warn("Kon markeringen niet opslaan:", error);
   }
 }
 
@@ -2110,6 +2569,7 @@ async function init() {
     gmax: data?.variants?.gmax || {},
   };
   state.variantDefinitionMap = buildVariantDefinitionMap(data?.variants?.all || []);
+  state.allVariantsBySpecies = groupVariantsBySpeciesList(data?.variants?.all || []);
 
   loadState();
   populateGameSelect();
@@ -2141,6 +2601,8 @@ async function init() {
   dom.showMegaSprites?.addEventListener("click", () => setSpriteMode("mega"));
   dom.showGmaxSprites?.addEventListener("click", () => setSpriteMode("gmax"));
   dom.showNostalgiaSprites?.addEventListener("click", () => setSpriteMode("nostalgia"));
+  dom.dexGrid?.addEventListener("change", onMarkToggleChange);
+  dom.dexListBody?.addEventListener("change", onMarkToggleChange);
 
   renderDex();
 }
