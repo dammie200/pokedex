@@ -368,6 +368,11 @@ body::before {
   box-shadow: 0 12px 24px rgba(46, 160, 67, 0.2);
 }
 
+.dex-list__row[data-home-owned="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(255, 203, 5, 0.25), 0 12px 28px rgba(255, 203, 5, 0.18);
+}
+
 .dex-list__cell {
   display: flex;
   align-items: center;
@@ -455,6 +460,15 @@ body::before {
 .pokemon-card[data-caught="true"] {
   border-color: var(--caught-border);
   box-shadow: 0 18px 40px rgba(46, 160, 67, 0.35);
+}
+
+.pokemon-card[data-home-owned="true"] {
+  border-color: var(--accent-strong);
+  box-shadow: 0 18px 40px rgba(255, 203, 5, 0.32), 0 0 0 3px rgba(255, 203, 5, 0.28);
+}
+
+.pokemon-card[data-home-owned="true"] .pokemon-card__media {
+  background: radial-gradient(circle at 50% 28%, rgba(255, 203, 5, 0.45), rgba(19, 14, 4, 0.85));
 }
 
 .pokemon-card--compact {
@@ -595,6 +609,51 @@ body::before {
 
 .pokemon-types--empty {
   opacity: 0.65;
+}
+
+.pokemon-flags {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.pokemon-flags[hidden] {
+  display: none !important;
+}
+
+.dex-grid--compact .pokemon-flags {
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+}
+
+.pokemon-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+.pokemon-flag:hover,
+.pokemon-flag:focus-within {
+  border-color: var(--accent);
+  background: rgba(255, 203, 5, 0.2);
+  transform: translateY(-1px);
+}
+
+.pokemon-flag__input {
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.pokemon-flag__label {
+  pointer-events: none;
 }
 
 .type-badge,
@@ -800,6 +859,76 @@ body::before {
   font-weight: 600;
 }
 
+.pokemon-variants {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.pokemon-variant {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  text-align: center;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.pokemon-variant:hover,
+.pokemon-variant:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 12px 24px rgba(255, 203, 5, 0.2);
+  outline: none;
+}
+
+.pokemon-variant.is-current {
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 2px rgba(255, 203, 5, 0.28);
+}
+
+.pokemon-variant__sprite {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.pokemon-variant__sprite--placeholder {
+  width: 96px;
+  height: 96px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pokemon-variant__name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.pokemon-variant__meta {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.pokemon-variant__badge {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 203, 5, 0.2);
+  border: 1px solid rgba(255, 203, 5, 0.35);
+  font-weight: 600;
+}
+
 .pokemon-details__section {
   margin-top: 1.5rem;
 }
@@ -842,8 +971,8 @@ body::before {
   outline: none;
 }
 
-.pokemon-details__encounters,
-.pokemon-details__evolution {
+.pokemon-details__evolution,
+.pokemon-details__variants {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -854,6 +983,11 @@ body::before {
   border-radius: 12px;
   padding: 0.85rem 1rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pokemon-details__evolution-step--special {
+  border-color: rgba(255, 203, 5, 0.35);
+  background: rgba(255, 203, 5, 0.12);
 }
 
 .pokemon-details__encounter {
