@@ -10,7 +10,13 @@ const FLAG_LABELS = {
   gmax: "G-Max",
   alpha: "Alpha",
 };
-const GMAX_FLAG_GAMES = new Set(["sword-shield"]);
+const FLAG_ICONS = {
+  shiny: "✧",
+  mega: "M",
+  gmax: "G",
+  alpha: "α",
+};
+const GMAX_FLAG_GAMES = new Set(["sword-shield", "pokemon-home"]);
 const MEGA_FLAG_GAMES = new Set([
   "x-y",
   "sun-moon",
@@ -18,6 +24,7 @@ const MEGA_FLAG_GAMES = new Set([
   "omega-ruby-alpha-sapphire",
   "lets-go",
   "legends-za",
+  "pokemon-home",
 ]);
 const ALPHA_FLAG_GAMES = new Set(["legends-arceus", "legends-za"]);
 
@@ -91,6 +98,7 @@ const state = {
     alpha: {},
   },
   variantGroupsBySpecies: new Map(),
+  entryCache: new Map(),
 };
 
 const TYPE_COLORS = {
@@ -861,11 +869,15 @@ function resolveSprite(entry, details, options = {}) {
   return "";
 }
 
-function getSpriteForEntry(entry, details) {
+function getSpriteForEntry(entry, details, options = {}) {
   if (!entry) return "";
-  if (state.spriteMode === "mega" || state.spriteMode === "gmax") {
+  const spriteMode = options.spriteMode || state.spriteMode;
+  const catchKey = options.catchKey || getEntryCatchKey(entry);
+  const gameId = options.gameId || state.currentGameId;
+
+  if (spriteMode === "mega" || spriteMode === "gmax") {
     const forms = getSpecialFormsForSpecies(entry.speciesId);
-    const match = forms.find((form) => form.type === state.spriteMode);
+    const match = forms.find((form) => form.type === spriteMode);
     if (match?.variant) {
       const variantSprite = getVariantSprite(match.variant);
       if (variantSprite) {
@@ -873,15 +885,20 @@ function getSpriteForEntry(entry, details) {
       }
     }
   }
-  if (state.spriteMode === "shiny") {
+  if (spriteMode === "shiny") {
     if (details?.sprites?.shiny) {
       return details.sprites.shiny;
     }
   }
-  if (state.spriteMode === "nostalgia") {
+  if (spriteMode === "nostalgia") {
     const nostalgic = getNostalgiaSprite(entry, details);
     if (nostalgic) {
       return nostalgic;
+    }
+  }
+  if (spriteMode !== "shiny" && catchKey && isFlagActive("shiny", catchKey, gameId)) {
+    if (details?.sprites?.shiny) {
+      return details.sprites.shiny;
     }
   }
   return resolveSprite(entry, details, { preferHome: false, preferEntry: true });
@@ -1088,13 +1105,17 @@ function renderStatusCheckboxes(container, entry, catchKey) {
   );
   if (!availableFlags.length) {
     container.hidden = true;
+    container.style.removeProperty("--flag-columns");
     return;
   }
   container.hidden = false;
+  const columnCount = Math.max(1, Math.min(availableFlags.length, 3));
+  container.style.setProperty("--flag-columns", String(columnCount));
   availableFlags.forEach((flag) => {
     const label = document.createElement("label");
     label.className = "pokemon-flag";
     label.dataset.flag = flag;
+    label.title = FLAG_LABELS[flag] || "";
     label.addEventListener("click", (event) => {
       event.stopPropagation();
     });
@@ -1117,11 +1138,16 @@ function renderStatusCheckboxes(container, entry, catchKey) {
       setFlagState(flag, catchKey, event.target.checked, gameId);
     });
 
-    const text = document.createElement("span");
-    text.className = "pokemon-flag__label";
-    text.textContent = FLAG_LABELS[flag];
+    const icon = document.createElement("span");
+    icon.className = "pokemon-flag__icon";
+    icon.textContent = FLAG_ICONS[flag] || FLAG_LABELS[flag] || "";
+    icon.setAttribute("aria-hidden", "true");
 
-    label.append(input, text);
+    const srText = document.createElement("span");
+    srText.className = "pokemon-flag__sr";
+    srText.textContent = FLAG_LABELS[flag];
+
+    label.append(input, icon, srText);
     container.append(label);
   });
 }
@@ -1131,6 +1157,9 @@ function renderGrid(entries, caughtSet) {
   dom.dexGrid.replaceChildren();
   const isCompact = state.viewMode === VIEW_MODES.COMPACT;
   dom.dexGrid.classList.toggle("dex-grid--compact", isCompact);
+  if (state.entryCache) {
+    state.entryCache.clear();
+  }
   const fragment = document.createDocumentFragment();
   entries.forEach((entry) => {
     const card = dom.cardTemplate.content.firstElementChild.cloneNode(true);
@@ -1162,8 +1191,13 @@ function renderGrid(entries, caughtSet) {
       });
     }
 
+    const catchKey = getEntryCatchKey(entry);
+    if (catchKey) {
+      state.entryCache.set(String(catchKey), entry);
+    }
+
     const cachedDetails = getCachedPokemonDetails(entry);
-    const spriteUrl = getSpriteForEntry(entry, cachedDetails);
+    const spriteUrl = getSpriteForEntry(entry, cachedDetails, { catchKey });
     if (sprite) {
       sprite.src = spriteUrl || "";
       sprite.alt = `${entry.name} sprite`;
@@ -1175,7 +1209,6 @@ function renderGrid(entries, caughtSet) {
     renderTypeBadges(typesContainer, entry.types || cachedDetails?.types || []);
     appendSpecialForms(special, entry);
 
-    const catchKey = getEntryCatchKey(entry);
     const isCaught = catchKey ? caughtSet.has(String(catchKey)) : false;
     card.dataset.id = catchKey || "";
     card.dataset.caught = String(isCaught);
@@ -1214,7 +1247,7 @@ function renderGrid(entries, caughtSet) {
           )
         : null;
       const imageNode = cardNode?.querySelector?.(".pokemon-sprite");
-      const nextSprite = getSpriteForEntry(entry, details);
+      const nextSprite = getSpriteForEntry(entry, details, { catchKey });
       if (imageNode && nextSprite && imageNode.src !== nextSprite) {
         imageNode.src = nextSprite;
       }
@@ -1324,6 +1357,62 @@ function updateCard(catchKey) {
   card.dataset.caught = String(isCaught);
   card.setAttribute("aria-pressed", String(isCaught));
   card.dataset.homeOwned = String(shouldHighlightHome(catchKey, state.currentGameId));
+}
+
+function updateCardFlags(catchKey, gameId = state.currentGameId) {
+  if (!catchKey || !dom.dexGrid) return;
+  const normalized = String(catchKey);
+  const selector = `.pokemon-card[data-id="${escapeSelector(normalized)}"]`;
+  const card = dom.dexGrid.querySelector(selector);
+  if (!card) return;
+
+  const flagContainer = card.querySelector("[data-flag-container]");
+  if (flagContainer) {
+    const inputs = flagContainer.querySelectorAll(".pokemon-flag__input");
+    inputs.forEach((input) => {
+      const flag = input.dataset.flag;
+      if (!flag) return;
+      input.checked = isFlagActive(flag, normalized, gameId);
+    });
+  }
+
+  const entry = state.entryCache?.get(normalized);
+  if (!entry) return;
+
+  const imageNode = card.querySelector(".pokemon-sprite");
+  if (!imageNode) return;
+
+  const cachedDetails = getCachedPokemonDetails(entry);
+  const nextSprite = getSpriteForEntry(entry, cachedDetails, {
+    catchKey: normalized,
+    gameId,
+  });
+  if (nextSprite && imageNode.src !== nextSprite) {
+    imageNode.src = nextSprite;
+  } else if (!nextSprite && imageNode.src) {
+    imageNode.removeAttribute("src");
+  }
+
+  if (!cachedDetails) {
+    ensurePokemonDetails(entry).then((details) => {
+      const cardNode = dom.dexGrid?.querySelector(selector);
+      if (!cardNode) return;
+      const spriteNode = cardNode.querySelector(".pokemon-sprite");
+      if (!spriteNode) return;
+      const resolvedSprite = getSpriteForEntry(entry, details, {
+        catchKey: normalized,
+        gameId,
+      });
+      if (resolvedSprite && spriteNode.src !== resolvedSprite) {
+        spriteNode.src = resolvedSprite;
+      }
+    });
+  }
+}
+
+function updateFlagIndicators(catchKey, gameId = state.currentGameId) {
+  if (!catchKey) return;
+  updateCardFlags(catchKey, gameId);
 }
 
 function updateEntryStatus(catchKey) {
@@ -2116,6 +2205,7 @@ function setFlagState(flag, catchKey, enabled, gameId = state.currentGameId) {
     set.delete(key);
   }
   persistState();
+  updateFlagIndicators(key, gameId);
 }
 
 function loadLegacyState() {
@@ -2425,6 +2515,9 @@ function renderDex() {
     updateBoxIndicator(state.currentBox, totalBoxes);
   } else {
     state.totalBoxes = 1;
+    if (state.entryCache) {
+      state.entryCache.clear();
+    }
     renderList(ordered, context.caughtSet);
     if (dom.dexGrid) dom.dexGrid.innerHTML = "";
     updateBoxIndicator(0, 1);
