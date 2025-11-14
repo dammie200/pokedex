@@ -44,6 +44,16 @@
           </label>
         </div>
 
+        <label class="control control--full" for="game-notes">
+          <span>Notities voor dit spel</span>
+          <textarea
+            id="game-notes"
+            name="game-notes"
+            rows="3"
+            placeholder="Bijvoorbeeld: team planning, ruil afspraken of exclusives"
+          ></textarea>
+        </label>
+
         <div class="control-group">
           <fieldset class="control view-toggle" aria-label="Weergave">
             <legend>Weergave</legend>
@@ -148,6 +158,29 @@
               Maak nostalgisch
             </button>
           </div>
+          <div class="gender-toggle" id="gender-sprite-toggle" hidden>
+            <span class="gender-toggle__label">Gender sprite</span>
+            <div class="toggle-buttons" role="group" aria-label="Selecteer gender sprite">
+              <button
+                type="button"
+                id="show-gender-male"
+                class="toggle-button is-active"
+                aria-pressed="true"
+              >
+                ♂
+                <span class="sr-only">Mannetje tonen</span>
+              </button>
+              <button
+                type="button"
+                id="show-gender-female"
+                class="toggle-button"
+                aria-pressed="false"
+              >
+                ♀
+                <span class="sr-only">Vrouwtje tonen</span>
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -180,20 +213,30 @@
     </main>
 
     <template id="pokemon-card-template">
-      <button class="pokemon-card" type="button" data-caught="false">
+      <article
+        class="pokemon-card"
+        data-caught="false"
+        role="button"
+        aria-pressed="false"
+        tabindex="0"
+      >
         <div class="pokemon-card__media" aria-hidden="true">
           <img class="pokemon-sprite" alt="" loading="lazy" />
           <span class="caught-indicator" aria-hidden="true">✔</span>
           <div class="pokemon-card__overlay">
             <div class="pokemon-card__top">
-              <span class="pokemon-number"></span>
-              <div class="pokemon-special"></div>
-            </div>
-            <span class="pokemon-name" role="button" tabindex="0"></span>
-            <div class="pokemon-types"></div>
+          <span class="pokemon-number"></span>
+          <div class="pokemon-flag-bar">
+            <div class="pokemon-flags" data-flag-container hidden></div>
           </div>
+          <div class="pokemon-special"></div>
+          <div class="pokemon-version-badges" data-version-badges hidden></div>
         </div>
-      </button>
+        <span class="pokemon-name" role="button" tabindex="0"></span>
+        <div class="pokemon-types"></div>
+      </div>
+    </div>
+      </article>
     </template>
 
     <template id="pokemon-list-row-template">
@@ -202,6 +245,7 @@
         <span class="dex-list__cell dex-list__cell--name">
           <button type="button" class="dex-list__name-button"></button>
           <div class="pokemon-special"></div>
+          <div class="pokemon-version-badges" data-version-badges hidden></div>
         </span>
         <span class="dex-list__cell dex-list__cell--types"></span>
         <span class="dex-list__cell dex-list__cell--status">
@@ -236,6 +280,10 @@
             <p id="pokemon-detail-number" class="pokemon-details__number"></p>
             <h2 id="pokemon-detail-name" class="pokemon-details__name"></h2>
             <div id="pokemon-detail-types" class="pokemon-details__types"></div>
+            <div id="pokemon-detail-versions" class="pokemon-details__versions" hidden>
+              <span class="pokemon-details__versions-label">Exclusief in:</span>
+              <div class="pokemon-version-badges" data-version-badges></div>
+            </div>
             <dl class="pokemon-details__meta">
               <div>
                 <dt>Hoogte</dt>
@@ -250,12 +298,12 @@
           </div>
         </header>
         <section class="pokemon-details__section">
-          <h3>Vanglocaties</h3>
-          <div id="pokemon-detail-encounters" class="pokemon-details__encounters"></div>
-        </section>
-        <section class="pokemon-details__section">
           <h3>Evolutie</h3>
           <div id="pokemon-detail-evolution" class="pokemon-details__evolution"></div>
+        </section>
+        <section class="pokemon-details__section">
+          <h3>Varianten</h3>
+          <div id="pokemon-detail-variants" class="pokemon-details__variants"></div>
         </section>
       </div>
     </dialog>
