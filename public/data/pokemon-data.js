@@ -278,6 +278,8 @@ const VARIANT_MAP = new Map(
     `${variant.speciesId}:${variant.form}`,
     {
       key: `${variant.speciesId}:${variant.form}`,
+      speciesId: variant.speciesId,
+      form: variant.form,
       regionCode: variant.regionCode,
       name: variant.name,
       sprite: variant.sprite || null,

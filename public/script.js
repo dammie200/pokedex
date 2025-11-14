@@ -2576,7 +2576,7 @@ function renderVariants(container, entry, details = null) {
     container.append(empty);
     return;
   }
-  const variants = getVariantsForEntry(entry);
+  const variants = getVariantsForEntry(entry, { includeMega: true, includeGmax: true });
   const genderVariants = buildGenderVariantEntries(entry, details);
   const combined = [...variants, ...genderVariants];
   if (!combined.length) {
