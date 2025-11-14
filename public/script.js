@@ -96,6 +96,9 @@ const dom = {
   showMegaSprites: document.getElementById("show-mega-sprites"),
   showGmaxSprites: document.getElementById("show-gmax-sprites"),
   showNostalgiaSprites: document.getElementById("show-nostalgia-sprites"),
+  genderSpriteToggle: document.getElementById("gender-sprite-toggle"),
+  showGenderMale: document.getElementById("show-gender-male"),
+  showGenderFemale: document.getElementById("show-gender-female"),
   dexGrid: document.getElementById("dex-grid"),
   dexList: document.getElementById("dex-list"),
   dexListBody: document.getElementById("dex-list-body"),
@@ -134,6 +137,7 @@ const state = {
   caughtFilter: "all",
   specialFilter: "all",
   spriteMode: "default",
+  genderDexSpriteMode: "male",
   filters: {
     search: "",
   },
@@ -806,6 +810,47 @@ function renderGenderDexError() {
   updateBoxControls();
 }
 
+function getActiveGenderSpriteMode() {
+  const currentDex = getCurrentDex();
+  if (currentDex?.id === GENDER_DEX_ID) {
+    return state.genderDexSpriteMode || "male";
+  }
+  return null;
+}
+
+function updateGenderSpriteToggleVisibility(currentDex = getCurrentDex()) {
+  if (!dom.genderSpriteToggle) return;
+  const shouldShow = currentDex?.id === GENDER_DEX_ID;
+  dom.genderSpriteToggle.hidden = !shouldShow;
+  if (shouldShow) {
+    updateGenderSpriteToggle();
+  }
+}
+
+function updateGenderSpriteToggle() {
+  const mode = state.genderDexSpriteMode || "male";
+  if (dom.showGenderMale) {
+    const isActive = mode === "male";
+    dom.showGenderMale.classList.toggle("is-active", isActive);
+    dom.showGenderMale.setAttribute("aria-pressed", String(isActive));
+  }
+  if (dom.showGenderFemale) {
+    const isActive = mode === "female";
+    dom.showGenderFemale.classList.toggle("is-active", isActive);
+    dom.showGenderFemale.setAttribute("aria-pressed", String(isActive));
+  }
+}
+
+function setGenderSpriteMode(mode) {
+  if (mode !== "male" && mode !== "female") return;
+  if (state.genderDexSpriteMode === mode) return;
+  state.genderDexSpriteMode = mode;
+  updateGenderSpriteToggle();
+  if (getCurrentDex()?.id === GENDER_DEX_ID) {
+    renderDex();
+  }
+}
+
 function updateGenderDexLoadingMessage() {
   if (!dom.dexGrid) return;
   const messageNode = dom.dexGrid.querySelector(".loading-message");
@@ -1203,11 +1248,27 @@ function resolveSprite(entry, details, options = {}) {
   return "";
 }
 
+function buildSpriteOptions(extra = {}) {
+  const options = { ...extra };
+  const genderMode = getActiveGenderSpriteMode();
+  if (genderMode) {
+    options.genderMode = genderMode;
+  }
+  return options;
+}
+
 function getSpriteForEntry(entry, details, options = {}) {
   if (!entry) return "";
   const spriteMode = options.spriteMode || state.spriteMode;
   const catchKey = options.catchKey || getEntryCatchKey(entry);
   const gameId = options.gameId || state.currentGameId;
+  const genderPreference = (() => {
+    if (options.genderMode === "male" || options.genderMode === "female") {
+      return options.genderMode;
+    }
+    return getActiveGenderSpriteMode();
+  })();
+  const preferFemale = genderPreference === "female";
 
   if (spriteMode === "mega" || spriteMode === "gmax") {
     const forms = getSpecialFormsForSpecies(entry.speciesId);
@@ -1220,6 +1281,9 @@ function getSpriteForEntry(entry, details, options = {}) {
     }
   }
   if (spriteMode === "shiny") {
+    if (preferFemale && details?.sprites?.shinyFemale) {
+      return details.sprites.shinyFemale;
+    }
     if (details?.sprites?.shiny) {
       return details.sprites.shiny;
     }
@@ -1231,8 +1295,19 @@ function getSpriteForEntry(entry, details, options = {}) {
     }
   }
   if (spriteMode !== "shiny" && catchKey && isFlagActive("shiny", catchKey, gameId)) {
+    if (preferFemale && details?.sprites?.shinyFemale) {
+      return details.sprites.shinyFemale;
+    }
     if (details?.sprites?.shiny) {
       return details.sprites.shiny;
+    }
+  }
+  if (preferFemale) {
+    if (details?.sprites?.female) {
+      return details.sprites.female;
+    }
+    if (details?.sprites?.shinyFemale) {
+      return details.sprites.shinyFemale;
     }
   }
   return resolveSprite(entry, details, { preferHome: false, preferEntry: true });
@@ -1532,7 +1607,8 @@ function renderGrid(entries, caughtSet) {
     }
 
     const cachedDetails = getCachedPokemonDetails(entry);
-    const spriteUrl = getSpriteForEntry(entry, cachedDetails, { catchKey });
+    const spriteOptions = buildSpriteOptions({ catchKey });
+    const spriteUrl = getSpriteForEntry(entry, cachedDetails, spriteOptions);
     if (sprite) {
       sprite.src = spriteUrl || "";
       sprite.alt = `${entry.name} sprite`;
@@ -1544,6 +1620,8 @@ function renderGrid(entries, caughtSet) {
     renderTypeBadges(typesContainer, entry.types || cachedDetails?.types || []);
     appendSpecialForms(special, entry);
     renderVersionBadges(versionContainer, entry);
+    const hasExclusive = Boolean(entry?.versionExclusive?.length);
+    card.classList.toggle("pokemon-card--exclusive", hasExclusive);
 
     const isCaught = catchKey ? caughtSet.has(String(catchKey)) : false;
     card.dataset.id = catchKey || "";
@@ -1583,7 +1661,7 @@ function renderGrid(entries, caughtSet) {
           )
         : null;
       const imageNode = cardNode?.querySelector?.(".pokemon-sprite");
-      const nextSprite = getSpriteForEntry(entry, details, { catchKey });
+      const nextSprite = getSpriteForEntry(entry, details, buildSpriteOptions({ catchKey }));
       if (imageNode && nextSprite && imageNode.src !== nextSprite) {
         imageNode.src = nextSprite;
       }
@@ -1721,10 +1799,8 @@ function updateCardFlags(catchKey, gameId = state.currentGameId) {
   if (!imageNode) return;
 
   const cachedDetails = getCachedPokemonDetails(entry);
-  const nextSprite = getSpriteForEntry(entry, cachedDetails, {
-    catchKey: normalized,
-    gameId,
-  });
+  const options = buildSpriteOptions({ catchKey: normalized, gameId });
+  const nextSprite = getSpriteForEntry(entry, cachedDetails, options);
   if (nextSprite && imageNode.src !== nextSprite) {
     imageNode.src = nextSprite;
   } else if (!nextSprite && imageNode.src) {
@@ -1737,10 +1813,11 @@ function updateCardFlags(catchKey, gameId = state.currentGameId) {
       if (!cardNode) return;
       const spriteNode = cardNode.querySelector(".pokemon-sprite");
       if (!spriteNode) return;
-      const resolvedSprite = getSpriteForEntry(entry, details, {
-        catchKey: normalized,
-        gameId,
-      });
+      const resolvedSprite = getSpriteForEntry(
+        entry,
+        details,
+        buildSpriteOptions({ catchKey: normalized, gameId })
+      );
       if (resolvedSprite && spriteNode.src !== resolvedSprite) {
         spriteNode.src = resolvedSprite;
       }
@@ -2842,6 +2919,7 @@ function renderDex() {
     updateBoxIndicator(0, 1);
     updateSpecialFilterControl({ mega: false, gmax: false });
     updateSpriteModeActions({ mega: false, gmax: false });
+    updateGenderSpriteToggleVisibility(null);
     updateDexProgress([], new Set());
     updateViewToggleButtons();
     updateBoxControls();
@@ -2857,11 +2935,14 @@ function renderDex() {
     updateBoxIndicator(0, 1);
     updateSpecialFilterControl({ mega: false, gmax: false });
     updateSpriteModeActions({ mega: false, gmax: false });
+    updateGenderSpriteToggleVisibility(null);
     updateDexProgress([], new Set());
     updateViewToggleButtons();
     updateBoxControls();
     return;
   }
+
+  updateGenderSpriteToggleVisibility(currentDex);
 
   if (currentDex.id === GENDER_DEX_ID) {
     const status = ensureGenderDexEntries(currentDex);
@@ -3060,6 +3141,8 @@ async function init() {
   dom.showMegaSprites?.addEventListener("click", () => setSpriteMode("mega"));
   dom.showGmaxSprites?.addEventListener("click", () => setSpriteMode("gmax"));
   dom.showNostalgiaSprites?.addEventListener("click", () => setSpriteMode("nostalgia"));
+  dom.showGenderMale?.addEventListener("click", () => setGenderSpriteMode("male"));
+  dom.showGenderFemale?.addEventListener("click", () => setGenderSpriteMode("female"));
 
   renderDex();
 }
