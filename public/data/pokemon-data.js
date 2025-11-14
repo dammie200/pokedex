@@ -1358,6 +1358,405 @@ const GAME_CONFIG = [
   },
 ];
 
+const VERSION_EXCLUSIVES_BY_DEX = {};
+
+const VERSION_EXCLUSIVES_BY_GAME = {
+  "scarlet-violet": {
+    scarlet: [
+      "larvitar",
+      "pupitar",
+      "tyranitar",
+      "drifloon",
+      "drifblim",
+      "stunky",
+      "skuntank",
+      "skrelp",
+      "dragalge",
+      "oranguru",
+      "stonjourner",
+      "armarouge",
+      "great-tusk",
+      "scream-tail",
+      "brute-bonnet",
+      "flutter-mane",
+      "slither-wing",
+      "sandy-shocks",
+      "roaring-moon",
+      "koraidon",
+      "walking-wake",
+      "gouging-fire",
+      "raging-bolt",
+    ],
+    violet: [
+      "misdreavus",
+      "mismagius",
+      "gulpin",
+      "swalot",
+      "bagon",
+      "shelgon",
+      "salamence",
+      "deino",
+      "zweilous",
+      "hydreigon",
+      "clauncher",
+      "clawitzer",
+      "passimian",
+      "eiscue",
+      "ceruledge",
+      "iron-treads",
+      "iron-bundle",
+      "iron-hands",
+      "iron-jugulis",
+      "iron-moth",
+      "iron-thorns",
+      "iron-valiant",
+      "miraidon",
+      "iron-leaves",
+      "iron-boulder",
+      "iron-crown",
+    ],
+  },
+  "sword-shield": {
+    sword: [
+      "seedot",
+      "nuzleaf",
+      "shiftry",
+      "mawile",
+      "solrock",
+      "zacian",
+      "deino",
+      "zweilous",
+      "hydreigon",
+      "jangmo-o",
+      "hakamo-o",
+      "kommo-o",
+      "farfetchd",
+      "sirfetchd",
+      "darumaka",
+      "darmanitan",
+      "scraggy",
+      "scrafty",
+      "gothita",
+      "gothorita",
+      "gothitelle",
+      "rufflet",
+      "braviary",
+      "passimian",
+      "stonjourner",
+      "sawk",
+      "turtonator",
+      "flapple",
+    ],
+    shield: [
+      "lotad",
+      "lombre",
+      "ludicolo",
+      "sableye",
+      "lunatone",
+      "zamazenta",
+      "larvitar",
+      "pupitar",
+      "tyranitar",
+      "goomy",
+      "sliggoo",
+      "goodra",
+      "ponyta",
+      "rapidash",
+      "corsola",
+      "cursola",
+      "zigzagoon",
+      "linoone",
+      "obstagoon",
+      "drampa",
+      "vullaby",
+      "mandibuzz",
+      "oranguru",
+      "eiscue",
+      "throh",
+      "appletun",
+    ],
+  },
+  "lets-go": {
+    "lets-go-pikachu": [
+      "oddish",
+      "gloom",
+      "vileplume",
+      "sandshrew",
+      "sandslash",
+      "growlithe",
+      "arcanine",
+      "grimer",
+      "muk",
+      "scyther",
+    ],
+    "lets-go-eevee": [
+      "bellsprout",
+      "weepinbell",
+      "victreebel",
+      "vulpix",
+      "ninetales",
+      "meowth",
+      "persian",
+      "koffing",
+      "weezing",
+      "pinsir",
+    ],
+  },
+  "brilliant-diamond-pearl": {
+    "brilliant-diamond": [
+      "seel",
+      "dewgong",
+      "scyther",
+      "scizor",
+      "murkrow",
+      "honchkrow",
+      "aron",
+      "lairon",
+      "aggron",
+      "larvitar",
+      "pupitar",
+      "tyranitar",
+      "cranidos",
+      "rampardos",
+      "stunky",
+      "skuntank",
+      "dialga",
+    ],
+    "shining-pearl": [
+      "slowpoke",
+      "slowbro",
+      "slowking",
+      "pinsir",
+      "misdreavus",
+      "mismagius",
+      "houndour",
+      "houndoom",
+      "shieldon",
+      "bastiodon",
+      "glameow",
+      "purugly",
+      "magby",
+      "magmar",
+      "magmortar",
+      "palkia",
+    ],
+  },
+  "diamond-pearl": {
+    diamond: [
+      "seel",
+      "dewgong",
+      "scyther",
+      "scizor",
+      "murkrow",
+      "honchkrow",
+      "aron",
+      "lairon",
+      "aggron",
+      "larvitar",
+      "pupitar",
+      "tyranitar",
+      "cranidos",
+      "rampardos",
+      "stunky",
+      "skuntank",
+      "dialga",
+    ],
+    pearl: [
+      "slowpoke",
+      "slowbro",
+      "slowking",
+      "pinsir",
+      "misdreavus",
+      "mismagius",
+      "houndour",
+      "houndoom",
+      "shieldon",
+      "bastiodon",
+      "glameow",
+      "purugly",
+      "magby",
+      "magmar",
+      "magmortar",
+      "palkia",
+    ],
+  },
+  "omega-ruby-alpha-sapphire": {
+    "omega-ruby": [
+      "seedot",
+      "nuzleaf",
+      "shiftry",
+      "mawile",
+      "zangoose",
+      "solrock",
+      "plusle",
+      "volbeat",
+      "groudon",
+      "latios",
+      "ho-oh",
+      "reshiram",
+      "dialga",
+      "tornadus",
+    ],
+    "alpha-sapphire": [
+      "lotad",
+      "lombre",
+      "ludicolo",
+      "sableye",
+      "seviper",
+      "lunatone",
+      "minun",
+      "illumise",
+      "kyogre",
+      "latias",
+      "lugia",
+      "zekrom",
+      "palkia",
+      "thundurus",
+    ],
+  },
+  "ruby-sapphire": {
+    ruby: [
+      "seedot",
+      "nuzleaf",
+      "shiftry",
+      "mawile",
+      "zangoose",
+      "solrock",
+      "plusle",
+      "volbeat",
+      "groudon",
+      "latios",
+    ],
+    sapphire: [
+      "lotad",
+      "lombre",
+      "ludicolo",
+      "sableye",
+      "seviper",
+      "lunatone",
+      "minun",
+      "illumise",
+      "kyogre",
+      "latias",
+    ],
+  },
+  "firered-leafgreen": {
+    "fire-red": [
+      "ekans",
+      "arbok",
+      "oddish",
+      "gloom",
+      "vileplume",
+      "psyduck",
+      "golduck",
+      "growlithe",
+      "arcanine",
+      "shellder",
+      "cloyster",
+      "scyther",
+      "electabuzz",
+    ],
+    "leaf-green": [
+      "sandshrew",
+      "sandslash",
+      "vulpix",
+      "ninetales",
+      "bellsprout",
+      "weepinbell",
+      "victreebel",
+      "meowth",
+      "persian",
+      "slowpoke",
+      "slowbro",
+      "pinsir",
+      "magmar",
+    ],
+  },
+  "heartgold-soulsilver": {
+    heartgold: [
+      "mankey",
+      "primeape",
+      "growlithe",
+      "arcanine",
+      "spinarak",
+      "ariados",
+      "gligar",
+      "teddiursa",
+      "ursaring",
+      "mantine",
+    ],
+    soulsilver: [
+      "vulpix",
+      "ninetales",
+      "meowth",
+      "persian",
+      "ledyba",
+      "ledian",
+      "skarmory",
+      "phanpy",
+      "donphan",
+      "delibird",
+    ],
+  },
+  "gold-silver-crystal": {
+    gold: [
+      "mankey",
+      "primeape",
+      "growlithe",
+      "arcanine",
+      "spinarak",
+      "ariados",
+      "gligar",
+      "teddiursa",
+      "ursaring",
+      "mantine",
+    ],
+    silver: [
+      "vulpix",
+      "ninetales",
+      "meowth",
+      "persian",
+      "ledyba",
+      "ledian",
+      "skarmory",
+      "phanpy",
+      "donphan",
+      "delibird",
+    ],
+  },
+  "red-blue-yellow": {
+    red: [
+      "ekans",
+      "arbok",
+      "oddish",
+      "gloom",
+      "vileplume",
+      "mankey",
+      "primeape",
+      "growlithe",
+      "arcanine",
+      "scyther",
+      "electabuzz",
+    ],
+    blue: [
+      "sandshrew",
+      "sandslash",
+      "vulpix",
+      "ninetales",
+      "meowth",
+      "persian",
+      "bellsprout",
+      "weepinbell",
+      "victreebel",
+      "magmar",
+      "pinsir",
+    ],
+  },
+};
+
+let speciesSlugLookup = null;
+const normalizedVersionExclusiveCache = new WeakMap();
+
 async function fetchJson(url) {
   const response = await fetch(url);
   if (!response.ok) {
@@ -1387,6 +1786,87 @@ function formatSpeciesName(apiName) {
     .join(" ");
 }
 
+function slugifySpeciesName(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[♀]/g, "-f")
+    .replace(/[♂]/g, "-m")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function normalizeSpeciesSlug(value) {
+  if (value === null || value === undefined) return null;
+  return slugifySpeciesName(value);
+}
+
+function createSpeciesSlugMap(species = []) {
+  const map = new Map();
+  species.forEach((entry) => {
+    if (!entry || !entry.id) return;
+    const slugCandidates = [entry.slug, slugifySpeciesName(entry.name)];
+    slugCandidates.forEach((candidate) => {
+      const normalized = normalizeSpeciesSlug(candidate);
+      if (normalized && !map.has(normalized)) {
+        map.set(normalized, entry.id);
+      }
+    });
+  });
+  return map;
+}
+
+function resolveSpeciesIdFromIdentifier(identifier) {
+  if (typeof identifier === "number" && Number.isFinite(identifier)) {
+    return identifier;
+  }
+  if (typeof identifier === "string") {
+    if (!identifier.trim()) return null;
+    const numeric = Number(identifier);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+    const normalized = normalizeSpeciesSlug(identifier);
+    if (normalized && speciesSlugLookup && speciesSlugLookup.has(normalized)) {
+      return speciesSlugLookup.get(normalized);
+    }
+  }
+  return null;
+}
+
+function normalizeVersionExclusiveConfig(config) {
+  if (!config) return null;
+  if (normalizedVersionExclusiveCache.has(config)) {
+    return normalizedVersionExclusiveCache.get(config);
+  }
+  const normalized = {};
+  Object.entries(config).forEach(([version, identifiers]) => {
+    const list = Array.isArray(identifiers) ? identifiers : [];
+    const ids = [];
+    list.forEach((value) => {
+      const speciesId = resolveSpeciesIdFromIdentifier(value);
+      if (!speciesId) {
+        if (value !== null && value !== undefined) {
+          console.warn(
+            `Kon version-exclusive vermelding '${value}' niet koppelen aan een species.`
+          );
+        }
+        return;
+      }
+      if (!ids.includes(speciesId)) {
+        ids.push(speciesId);
+      }
+    });
+    if (ids.length) {
+      normalized[version] = ids;
+    }
+  });
+  normalizedVersionExclusiveCache.set(config, normalized);
+  return normalized;
+}
+
 async function loadAllSpecies() {
   const species = [];
   const seen = new Set();
@@ -1400,7 +1880,7 @@ async function loadAllSpecies() {
         return;
       }
       seen.add(id);
-      species.push({ id, name: formatSpeciesName(result.name) });
+      species.push({ id, name: formatSpeciesName(result.name), slug: result.name });
     });
     nextUrl = data.next;
   }
@@ -2411,6 +2891,8 @@ async function getPokemonDetails(entry) {
   const sprites = {
     default: pokemonData.sprites?.front_default || null,
     shiny: pokemonData.sprites?.front_shiny || null,
+    female: pokemonData.sprites?.front_female || null,
+    shinyFemale: pokemonData.sprites?.front_shiny_female || null,
     artwork:
       pokemonData.sprites?.other?.["official-artwork"]?.front_default ||
       pokemonData.sprites?.other?.["official-artwork"]?.front_shiny ||
@@ -2450,11 +2932,56 @@ async function getPokemonDetails(entry) {
 }
 
 
+function getVersionExclusiveConfig({ dexId, gameId } = {}) {
+  if (dexId) {
+    const direct = VERSION_EXCLUSIVES_BY_DEX[dexId] || VERSION_EXCLUSIVES_BY_DEX[String(dexId)];
+    if (direct) {
+      return normalizeVersionExclusiveConfig(direct);
+    }
+  }
+  if (gameId) {
+    const gameConfig =
+      VERSION_EXCLUSIVES_BY_GAME[gameId] || VERSION_EXCLUSIVES_BY_GAME[String(gameId)];
+    if (gameConfig) {
+      return normalizeVersionExclusiveConfig(gameConfig);
+    }
+  }
+  return null;
+}
+
+function annotateVersionExclusives(entries = [], options = {}) {
+  const config = getVersionExclusiveConfig(options);
+  if (!config) {
+    return { entries, versions: [] };
+  }
+  const versionIds = Object.keys(config).filter(
+    (version) => Array.isArray(config[version]) && config[version].length
+  );
+  if (!versionIds.length) {
+    return { entries, versions: [] };
+  }
+  const speciesVersionMap = new Map();
+  versionIds.forEach((versionId) => {
+    config[versionId].forEach((speciesId) => {
+      const key = String(speciesId);
+      if (!speciesVersionMap.has(key)) {
+        speciesVersionMap.set(key, new Set());
+      }
+      speciesVersionMap.get(key).add(versionId);
+    });
+  });
+  entries.forEach((entry) => {
+    const versions = speciesVersionMap.get(String(entry.speciesId));
+    entry.versionExclusive = versions ? Array.from(versions) : [];
+  });
+  return { entries, versions: versionIds };
+}
 
 async function loadPokedexData() {
   await preloadVariantSprites();
   const species = await loadAllSpecies();
   const speciesById = new Map(species.map((entry) => [entry.id, entry]));
+  speciesSlugLookup = createSpeciesSlugMap(species);
 
   const games = [];
   for (const game of GAME_CONFIG) {
@@ -2467,10 +2994,20 @@ async function loadPokedexData() {
         species,
         {
           gameId: game.id,
+          dexId: dex.id,
           existingDexEntries,
         }
       );
-      dexes.push({ id: dex.id, name: dex.name, entries });
+      const { entries: annotatedEntries, versions } = annotateVersionExclusives(
+        entries,
+        { dexId: dex.id, gameId: game.id }
+      );
+      dexes.push({
+        id: dex.id,
+        name: dex.name,
+        entries: annotatedEntries,
+        versions,
+      });
       existingDexEntries.set(dex.id, entries);
     }
     games.push({ id: game.id, name: game.name, dexes });
