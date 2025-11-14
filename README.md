@@ -17,6 +17,7 @@ Een eenvoudige webapplicatie om een Living Dex bij te houden voor meerdere Poké
 - Zoek binnen de geselecteerde Living Dex.
 - Houd ook de complete Pokémon HOME Pokédex bij en kies daarnaast voor de nieuwe Legends ZA Pokédex.
 - Ondersteuning uitgebreid met klassieke spellen van Red/Blue tot en met Ultra Sun & Ultra Moon (inclusief Mega-overzichtsdexen waar relevant).
+- Exporteer of importeer je volledige voortgang (inclusief notities en speciale vlaggen) als JSON om eenvoudig back-ups te maken of apparaten te synchroniseren.
 - Nummering toont nu het regionale dexnummer gevolgd door het nationale nummer (bijv. `#031 (#079*G)` voor Galarian Slowpoke). Een `*` met regioletter onderscheidt regionale vormen.
 - Regionale vormen gebruiken nu automatisch de bijbehorende PokéAPI `pokemon-form` sprites, zodat Alolan, Galarian, Hisuian en Paldean varianten correct worden weergegeven.
 
@@ -61,3 +62,25 @@ Navigeer vervolgens in je browser naar `http://localhost:8000/public/` en open `
 
 > ℹ️  De app haalt de volledige lijst van 1.025 Pokémon en alle regionale Pokédexen live op
 > via de PokéAPI. Zorg dus voor een actieve internetverbinding bij het laden van de pagina.
+
+## Export & import
+
+Gebruik de knoppen **Data exporteren** en **Data importeren** in de filterbalk om je voortgang als JSON-bestand op te slaan of terug te zetten. Het exportbestand bevat:
+
+- gevangen Pokémon per spel
+- alle shiny/mega/G-Max/alpha-vlaggen per spel
+- je favoriete Pokédex selectie per spel
+- spelnotities
+- voorkeuren voor thema en ingeklapte filters
+
+Na het importeren worden de gegevens direct toegepast en opnieuw opgeslagen in `localStorage`.
+
+## Deployen op Netlify
+
+Deze repository is al voorbereid voor Netlify deployments. Koppel de repo aan Netlify en kies voor een standaard *Sites from Git* deploy zonder build-command.
+
+- **Publish directory**: `public`
+- **Build command**: *leeg laten* (statische site)
+- Het meegeleverde `netlify.toml` zorgt ervoor dat alle routes naar `index.html` verwijzen, zodat de client-side router goed blijft werken.
+
+Wil je handmatig deployen? Maak een nieuwe site aan op Netlify, upload de inhoud van `public/` of wijs een Git-branch met deze repo aan. Zodra de deploy klaar is, is de Pokédex direct beschikbaar.
