@@ -80,6 +80,8 @@ const MEGA_FLAG_GAMES = new Set([
 ]);
 const ALPHA_FLAG_GAMES = new Set(["legends-arceus", "legends-za"]);
 
+const DATA_EXPORT_VERSION = 1;
+
 const VIEW_MODES = {
   GRID: "grid",
   COMPACT: "compact",
@@ -113,6 +115,9 @@ const dom = {
   viewListToggle: document.getElementById("view-list"),
   selectAll: document.getElementById("select-all"),
   clearAll: document.getElementById("clear-all"),
+  exportData: document.getElementById("export-data"),
+  importData: document.getElementById("import-data"),
+  importDataInput: document.getElementById("import-data-input"),
   spriteModeActions: document.getElementById("sprite-mode-actions"),
   showDefaultSprites: document.getElementById("show-default-sprites"),
   showShinySprites: document.getElementById("show-shiny-sprites"),
@@ -2847,22 +2852,236 @@ function getGameNotes(gameId = state.currentGameId) {
   return typeof note === "string" ? note : "";
 }
 
+function getSerializableGameNotes() {
+  return Object.fromEntries(
+    Object.entries(state.gameNotesByGame || {}).filter(
+      ([, note]) => typeof note === "string" && note.length
+    )
+  );
+}
+
 function persistGameNotes() {
   try {
-    const entries = Object.entries(state.gameNotesByGame || {}).filter(
-      ([, note]) => typeof note === "string" && note.length
-    );
-    if (!entries.length) {
+    const notes = getSerializableGameNotes();
+    if (!Object.keys(notes).length) {
       localStorage.removeItem(GAME_NOTES_STORAGE_KEY);
       return;
     }
-    localStorage.setItem(
-      GAME_NOTES_STORAGE_KEY,
-      JSON.stringify(Object.fromEntries(entries))
-    );
+    localStorage.setItem(GAME_NOTES_STORAGE_KEY, JSON.stringify(notes));
   } catch (error) {
     console.warn("Kon spelnotities niet opslaan:", error);
   }
+}
+
+function serializeIdSet(idSet) {
+  if (idSet && typeof idSet.values === "function") {
+    return Array.from(idSet.values());
+  }
+  if (Array.isArray(idSet)) {
+    return idSet.map((value) => String(value));
+  }
+  return [];
+}
+
+function serializeCaughtState() {
+  return Object.fromEntries(
+    Object.entries(state.caughtByGame || {}).map(([gameId, idSet]) => [
+      gameId,
+      serializeIdSet(idSet),
+    ])
+  );
+}
+
+function serializeFlagState() {
+  return FLAG_KEYS.reduce((result, flag) => {
+    const perGame = state.flagSets?.[flag] || {};
+    result[flag] = Object.fromEntries(
+      Object.entries(perGame).map(([gameId, idSet]) => [
+        gameId,
+        serializeIdSet(idSet),
+      ])
+    );
+    return result;
+  }, {});
+}
+
+function getSerializableDexSelection() {
+  return Object.fromEntries(
+    Object.entries(state.selectedDexByGame || {}).filter(
+      ([, dexId]) => typeof dexId === "string" && dexId.length
+    )
+  );
+}
+
+function buildExportPayload() {
+  return {
+    version: DATA_EXPORT_VERSION,
+    exportedAt: new Date().toISOString(),
+    data: {
+      caughtByGame: serializeCaughtState(),
+      flagSets: serializeFlagState(),
+      selectedDexByGame: getSerializableDexSelection(),
+      gameNotesByGame: getSerializableGameNotes(),
+      currentGameId: state.currentGameId,
+      currentDexId: state.currentDexId,
+      theme: state.theme,
+      controlsCollapsed: state.controlsCollapsed,
+    },
+  };
+}
+
+function triggerDownload(filename, contents) {
+  const blob = new Blob([contents], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  const target = document.body || document.documentElement || document.createElement("div");
+  target.append(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function exportTrackerData() {
+  try {
+    const payload = buildExportPayload();
+    const timestamp = new Date().toISOString().replace(/[:T]/g, "-").split(".")[0];
+    triggerDownload(`living-dex-export-${timestamp}.json`, JSON.stringify(payload, null, 2));
+  } catch (error) {
+    console.error("Kon data niet exporteren:", error);
+    alert("Exporteren is mislukt. Probeer het opnieuw.");
+  }
+}
+
+function applyImportedPayload(payload) {
+  const data = payload?.data || payload?.storage || payload;
+  if (!data || typeof data !== "object") {
+    throw new Error("Ongeldig bestand");
+  }
+
+  const progressSource =
+    data.caughtByGame || data.progress || data.pokemon || data.caught || {};
+  state.caughtByGame = Object.fromEntries(
+    Object.entries(progressSource).map(([gameId, ids]) => [
+      gameId,
+      normalizeStoredIds(ids),
+    ])
+  );
+
+  const nextFlagSets = {};
+  FLAG_KEYS.forEach((flag) => {
+    const source = data.flagSets?.[flag] || data.flags?.[flag] || {};
+    nextFlagSets[flag] = Object.fromEntries(
+      Object.entries(source).map(([gameId, ids]) => [
+        gameId,
+        normalizeStoredIds(ids),
+      ])
+    );
+  });
+  state.flagSets = nextFlagSets;
+
+  const dexSelectionSource = data.selectedDexByGame || data.dexSelection || {};
+  state.selectedDexByGame = Object.fromEntries(
+    Object.entries(dexSelectionSource).filter(
+      ([, dexId]) => typeof dexId === "string" && dexId.length
+    )
+  );
+
+  const notesSource = data.gameNotesByGame || data.notes || {};
+  state.gameNotesByGame = Object.fromEntries(
+    Object.entries(notesSource)
+      .map(([gameId, note]) => [
+        gameId,
+        typeof note === "string" ? note.replace(/\r\n/g, "\n") : "",
+      ])
+      .filter(([, note]) => note.length)
+  );
+
+  const importedTheme = data.theme;
+  if (importedTheme === THEMES.DARK || importedTheme === THEMES.LIGHT) {
+    applyTheme(importedTheme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, importedTheme);
+    } catch (error) {
+      console.warn("Kon thema niet opslaan:", error);
+    }
+  }
+
+  if (typeof data.controlsCollapsed === "boolean") {
+    applyControlsCollapsed(data.controlsCollapsed);
+    try {
+      localStorage.setItem(
+        CONTROLS_COLLAPSE_STORAGE_KEY,
+        data.controlsCollapsed ? "true" : "false"
+      );
+    } catch (error) {
+      console.warn("Kon filtervoorkeur niet opslaan:", error);
+    }
+  }
+
+  persistState();
+  persistDexSelection();
+  persistGameNotes();
+
+  const importedGameId = data.currentGameId;
+  const importedDexId = data.currentDexId;
+
+  if (typeof importedGameId === "string" && dom.gameSelect) {
+    const games = getGames();
+    if (games.some((game) => game.id === importedGameId)) {
+      state.currentGameId = importedGameId;
+      dom.gameSelect.value = importedGameId;
+      try {
+        localStorage.setItem(`${STORAGE_KEY}:current-game`, importedGameId);
+      } catch (error) {
+        console.warn("Kon huidig spel niet opslaan:", error);
+      }
+      populateDexSelect();
+    }
+  }
+
+  if (typeof importedDexId === "string" && dom.dexSelect) {
+    const currentGame = getCurrentGame();
+    const dexes = getDexesForGame(currentGame);
+    if (dexes.some((dex) => dex.id === importedDexId)) {
+      dom.dexSelect.value = importedDexId;
+      setCurrentDex(importedDexId);
+    }
+  }
+
+  updateGameNotesInput();
+  renderDex();
+}
+
+function handleImportFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.addEventListener("error", () => {
+    console.error("Kon bestand niet lezen:", reader.error);
+    alert("Importeren is mislukt. Controleer het bestand en probeer opnieuw.");
+  });
+  reader.addEventListener("load", () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      applyImportedPayload(parsed);
+      alert("Data succesvol geïmporteerd!");
+    } catch (error) {
+      console.error("Kon data niet importeren:", error);
+      alert("Importeren is mislukt. Controleer het bestand en probeer opnieuw.");
+    }
+  });
+  reader.readAsText(file);
+}
+
+function onImportInputChange(event) {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement)) return;
+  const [file] = input.files || [];
+  if (file) {
+    handleImportFile(file);
+  }
+  input.value = "";
 }
 
 function setGameNotes(value, gameId = state.currentGameId) {
@@ -3060,24 +3279,8 @@ function loadState() {
 
 function persistState() {
   try {
-    const serializable = Object.fromEntries(
-      Object.entries(state.caughtByGame).map(([gameId, idSet]) => [
-        gameId,
-        Array.from(idSet.values()),
-      ])
-    );
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable));
-    const serializableFlags = FLAG_KEYS.reduce((result, flag) => {
-      const perGame = state.flagSets[flag] || {};
-      result[flag] = Object.fromEntries(
-        Object.entries(perGame).map(([gameId, idSet]) => [
-          gameId,
-          Array.from(idSet.values()),
-        ])
-      );
-      return result;
-    }, {});
-    localStorage.setItem(FLAG_STORAGE_KEY, JSON.stringify(serializableFlags));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeCaughtState()));
+    localStorage.setItem(FLAG_STORAGE_KEY, JSON.stringify(serializeFlagState()));
     LEGACY_STORAGE_KEYS.forEach((key) => {
       try {
         localStorage.removeItem(key);
@@ -3094,7 +3297,7 @@ function persistDexSelection() {
   try {
     localStorage.setItem(
       DEX_SELECTION_STORAGE_KEY,
-      JSON.stringify(state.selectedDexByGame)
+      JSON.stringify(getSerializableDexSelection())
     );
   } catch (error) {
     console.warn("Kon dex selectie niet opslaan:", error);
@@ -3454,6 +3657,15 @@ async function init() {
   dom.viewListToggle?.addEventListener("click", () => setViewMode(VIEW_MODES.LIST));
   dom.selectAll?.addEventListener("click", selectAllVisible);
   dom.clearAll?.addEventListener("click", clearAllVisible);
+  dom.exportData?.addEventListener("click", (event) => {
+    event.preventDefault();
+    exportTrackerData();
+  });
+  dom.importData?.addEventListener("click", (event) => {
+    event.preventDefault();
+    dom.importDataInput?.click();
+  });
+  dom.importDataInput?.addEventListener("change", onImportInputChange);
   dom.previousBox?.addEventListener("click", () => changeBox(-1));
   dom.nextBox?.addEventListener("click", () => changeBox(1));
   dom.boxInput?.addEventListener("change", onBoxInputChange);

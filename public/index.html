@@ -158,6 +158,12 @@
             <button type="button" id="clear-all" class="action-button">
               Alles wissen
             </button>
+            <button type="button" id="export-data" class="action-button">
+              Data exporteren
+            </button>
+            <button type="button" id="import-data" class="action-button">
+              Data importeren
+            </button>
             <button
               type="button"
               id="toggle-theme"
@@ -340,6 +346,8 @@
         worden automatisch opgehaald via de PokéAPI.
       </p>
     </footer>
+
+    <input type="file" id="import-data-input" accept="application/json" hidden />
 
     <script src="data/pokemon-data.js"></script>
     <script src="script.js" type="module"></script>
