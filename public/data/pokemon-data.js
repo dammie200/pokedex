@@ -265,28 +265,58 @@ const GMAX_FORMS = [
   { speciesId: 892, form: "gmax-rapid-strike", regionCode: "GM", name: "Urshifu (Gigantamax Rapid Strike)", formSlug: "urshifu-rapid-strike-gmax", pokemonSlug: "urshifu-rapid-strike-gmax" },
 ];
 
-const ALL_VARIANTS = [
-  ...REGIONAL_VARIANTS.map((variant) => ({ ...variant, category: "regional" })),
-  ...MEGA_FORMS.map((variant) => ({ ...variant, category: "mega" })),
-  ...GMAX_FORMS.map((variant) => ({ ...variant, category: "gmax" })),
+const SPECIAL_FORM_CACHE_KEY = "pokedex-special-forms-v1";
+const SPECIAL_FORM_CACHE_VERSION = 2;
+const SPECIAL_FORM_FETCH_LIMIT = 2000;
+const SPECIAL_FORM_SKIP_PATTERNS = [
+  /-mega(?![a-z])/,
+  /-gmax(?![a-z])/,
+  /-alola(?![a-z])/,
+  /-galar(?![a-z])/,
+  /-hisui(?![a-z])/,
+  /-paldea(?![a-z])/, 
 ];
 
+const ALL_VARIANTS = [];
+const VARIANT_MAP = new Map();
 
+function registerVariant(variant) {
+  if (!variant || !variant.speciesId || !variant.form) {
+    return null;
+  }
 
-const VARIANT_MAP = new Map(
-  ALL_VARIANTS.map((variant) => [
-    `${variant.speciesId}:${variant.form}`,
-    {
-      key: `${variant.speciesId}:${variant.form}`,
-      regionCode: variant.regionCode,
-      name: variant.name,
-      sprite: variant.sprite || null,
-      formSlug: variant.formSlug || null,
-      pokemonSlug: variant.pokemonSlug || null,
-      pokemonId: variant.pokemonId || null,
-      category: variant.category || null,
-    },
-  ])
+  const key = variant.key || `${variant.speciesId}:${variant.form}`;
+  if (VARIANT_MAP.has(key)) {
+    return VARIANT_MAP.get(key);
+  }
+
+  const entry = {
+    key,
+    speciesId: Number(variant.speciesId),
+    form: variant.form,
+    regionCode: variant.regionCode || null,
+    name: variant.name || null,
+    sprite: variant.sprite || null,
+    formSlug: variant.formSlug || null,
+    pokemonSlug: variant.pokemonSlug || null,
+    pokemonId: variant.pokemonId || null,
+    category: variant.category || null,
+    formLabel: variant.formLabel || null,
+  };
+
+  VARIANT_MAP.set(key, entry);
+  ALL_VARIANTS.push(entry);
+  return entry;
+}
+
+REGIONAL_VARIANTS.forEach((variant) =>
+  registerVariant({ ...variant, category: "regional" })
+);
+MEGA_FORMS.forEach((variant) =>
+  registerVariant({ ...variant, category: "mega" })
+);
+GMAX_FORMS.forEach((variant) =>
+  registerVariant({ ...variant, category: "gmax" })
 );
 
 function groupVariantsBySpecies(variants) {
@@ -358,7 +388,7 @@ async function preloadVariantSprites() {
         }
       } catch (error) {
         console.warn(
-          `Kon sprite voor variant '${variant.formSlug}' niet laden:`,
+          `Could not load sprite for variant '${variant.formSlug}':`,
           error
         );
       }
@@ -386,6 +416,359 @@ async function preloadVariantSprites() {
   });
 }
 
+function shouldSkipSpecialFormName(name) {
+  if (!name || !name.includes("-")) {
+    return true;
+  }
+  return SPECIAL_FORM_SKIP_PATTERNS.some((pattern) => pattern.test(name));
+}
+
+function formatFormLabel(value) {
+  if (!value) return "";
+  return value
+    .replace(/_/g, " ")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\w+/g, (word) => word[0].toUpperCase() + word.slice(1));
+}
+
+function formatSpecialVariantName(speciesName, formLabel) {
+  if (!speciesName && !formLabel) return "";
+  if (!speciesName) return formLabel || "";
+  return formLabel ? `${speciesName} (${formLabel})` : speciesName;
+}
+
+function createSpeciesSlugList(speciesList) {
+  if (!Array.isArray(speciesList)) return [];
+  return speciesList
+    .map((entry) => entry?.slug)
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+}
+
+function inferSpeciesSlugFromFormName(formName, slugList) {
+  if (!formName) return null;
+  return slugList.find(
+    (slug) => formName === slug || formName.startsWith(`${slug}-`)
+  );
+}
+
+function deriveFormIdentifier(speciesSlug, formSlug) {
+  if (!formSlug || !speciesSlug) return null;
+  if (formSlug === speciesSlug) return null;
+  if (formSlug.startsWith(`${speciesSlug}-`)) {
+    const suffix = formSlug.slice(speciesSlug.length + 1);
+    return suffix || null;
+  }
+  const segments = formSlug.split("-");
+  return segments.length > 1 ? segments.slice(1).join("-") : null;
+}
+
+function getEnglishFormName(details, fallback) {
+  if (details?.form_names?.length) {
+    const english = details.form_names.find(
+      (entry) => entry?.language?.name === "en" && entry?.name
+    );
+    if (english?.name) {
+      return english.name;
+    }
+  }
+  if (details?.form_name) {
+    return formatFormLabel(details.form_name);
+  }
+  if (details?.names?.length) {
+    const english = details.names.find(
+      (entry) => entry?.language?.name === "en" && entry?.name
+    );
+    if (english?.name) {
+      return english.name;
+    }
+  }
+  return formatFormLabel(fallback);
+}
+
+function readSpecialFormCache() {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(SPECIAL_FORM_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (
+      !parsed ||
+      parsed.version !== SPECIAL_FORM_CACHE_VERSION ||
+      !Array.isArray(parsed.variants)
+    ) {
+      return null;
+    }
+    return parsed.variants;
+  } catch (error) {
+    console.warn("Could not read special form cache:", error);
+    return null;
+  }
+}
+
+function writeSpecialFormCache(variants) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const payload = JSON.stringify({
+      version: SPECIAL_FORM_CACHE_VERSION,
+      variants,
+    });
+    localStorage.setItem(SPECIAL_FORM_CACHE_KEY, payload);
+  } catch (error) {
+    console.warn("Could not store special form cache:", error);
+  }
+}
+
+function registerCachedSpecialForms(cacheEntries, slugLookup) {
+  if (!Array.isArray(cacheEntries) || !slugLookup) return;
+  cacheEntries.forEach((entry) => {
+    if (!entry || !entry.speciesSlug || !entry.form) return;
+    const species = getSpeciesFromSlugLookup(slugLookup, entry.speciesSlug);
+    if (!species) return;
+    registerVariant({
+      speciesId: species.id,
+      form: entry.form,
+      name: entry.name,
+      formSlug: entry.formSlug,
+      pokemonSlug: entry.pokemonSlug,
+      pokemonId: entry.pokemonId,
+      sprite: entry.sprite,
+      category: "special",
+      formLabel: entry.formLabel || null,
+    });
+  });
+}
+
+async function processSpecialFormEntry(entry, options) {
+  const { slugLookup, slugList, collected } = options;
+  if (!entry?.name || !entry?.url || !slugLookup) return;
+
+  try {
+    const data = await fetchJson(entry.url);
+    if (!data || data.is_default) {
+      return;
+    }
+    const pokemonName = data.pokemon?.name || entry.name;
+    const speciesSlug = inferSpeciesSlugFromFormName(pokemonName, slugList);
+    if (!speciesSlug) {
+      return;
+    }
+    const species = getSpeciesFromSlugLookup(slugLookup, speciesSlug);
+    if (!species) {
+      return;
+    }
+    const formIdentifier = deriveFormIdentifier(species.slug, entry.name);
+    if (!formIdentifier) {
+      return;
+    }
+    const key = `${species.id}:${formIdentifier}`;
+    if (VARIANT_MAP.has(key)) {
+      return;
+    }
+
+    const formLabel = getEnglishFormName(data, entry.name);
+    const pokemonId = data.pokemon?.url ? parseIdFromUrl(data.pokemon.url) : null;
+    const sprite =
+      data.sprites?.front_default ||
+      data.sprites?.front_shiny ||
+      data.sprites?.back_default ||
+      data.sprites?.other?.["official-artwork"]?.front_default ||
+      data.sprites?.other?.home?.front_default ||
+      null;
+
+    const displayName = formatSpecialVariantName(species.name, formLabel);
+
+    registerVariant({
+      speciesId: species.id,
+      form: formIdentifier,
+      name: displayName,
+      formSlug: entry.name,
+      pokemonSlug: pokemonName,
+      pokemonId,
+      sprite,
+      category: "special",
+      formLabel: formLabel || null,
+    });
+
+    if (Array.isArray(collected)) {
+      collected.push({
+        speciesSlug: species.slug,
+        form: formIdentifier,
+        formSlug: entry.name,
+        name: displayName,
+        pokemonSlug: pokemonName,
+        pokemonId,
+        sprite,
+        formLabel: formLabel || null,
+      });
+    }
+  } catch (error) {
+    console.warn(`Could not load special form '${entry.name}':`, error);
+  }
+}
+
+async function processSpecialFormVarieties(speciesList, options = {}) {
+  const { collected } = options;
+  if (!Array.isArray(speciesList) || !speciesList.length) {
+    return;
+  }
+
+  const batchSize = 10;
+  for (let i = 0; i < speciesList.length; i += batchSize) {
+    const batch = speciesList.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (species) => {
+        if (!species || !species.id || !species.slug) return;
+        try {
+          const data = await fetchSpeciesResource(species.id);
+          const varieties = Array.isArray(data?.varieties) ? data.varieties : [];
+          if (!varieties.length) return;
+          for (const variety of varieties) {
+            if (!variety || variety.is_default) continue;
+            const pokemonName = variety.pokemon?.name;
+            if (!pokemonName) continue;
+            if (shouldSkipSpecialFormName(pokemonName)) continue;
+            const formIdentifier = deriveFormIdentifier(species.slug, pokemonName);
+            if (!formIdentifier) continue;
+            const key = `${species.id}:${formIdentifier}`;
+            if (VARIANT_MAP.has(key)) continue;
+            const pokemonData = await fetchPokemonResource(pokemonName);
+            const pokemonId =
+              pokemonData?.id ||
+              (variety.pokemon?.url ? parseIdFromUrl(variety.pokemon.url) : null);
+            const formLabel = formatFormLabel(formIdentifier);
+            const sprite =
+              pokemonData?.sprites?.front_default ||
+              pokemonData?.sprites?.front_shiny ||
+              pokemonData?.sprites?.back_default ||
+              pokemonData?.sprites?.other?.["official-artwork"]?.front_default ||
+              pokemonData?.sprites?.other?.home?.front_default ||
+              null;
+            const resolvedSprite =
+              sprite ||
+              (pokemonId
+                ? `${SPRITE_BASE_URL}/other/home/${pokemonId}.png`
+                : null) ||
+              (pokemonId ? `${SPRITE_BASE_URL}/${pokemonId}.png` : null);
+
+            const name = formatSpecialVariantName(species.name, formLabel);
+
+            registerVariant({
+              speciesId: species.id,
+              form: formIdentifier,
+              name,
+              formSlug: pokemonName,
+              pokemonSlug: pokemonName,
+              pokemonId,
+              sprite: resolvedSprite,
+              category: "special",
+              formLabel: formLabel || null,
+            });
+
+            if (Array.isArray(collected)) {
+              collected.push({
+                speciesSlug: species.slug,
+                form: formIdentifier,
+                formSlug: pokemonName,
+                name,
+                pokemonSlug: pokemonName,
+                pokemonId,
+                sprite: resolvedSprite,
+                formLabel: formLabel || null,
+              });
+            }
+          }
+        } catch (error) {
+          console.warn(
+            `Could not process special form varieties for '${species.slug}':`,
+            error
+          );
+        }
+      })
+    );
+  }
+}
+
+let specialFormsReady = false;
+let specialFormsPromise = null;
+
+async function ensureSpecialFormsLoaded(speciesList) {
+  if (specialFormsReady) return;
+  if (specialFormsPromise) {
+    await specialFormsPromise;
+    return;
+  }
+
+  specialFormsPromise = (async () => {
+    if (!Array.isArray(speciesList) || !speciesList.length) {
+      specialFormsReady = true;
+      return;
+    }
+
+    const slugLookup = speciesSlugLookup || createSpeciesSlugMap(speciesList);
+    const cached = readSpecialFormCache();
+    if (cached?.length) {
+      registerCachedSpecialForms(cached, slugLookup);
+      specialFormsReady = true;
+      return;
+    }
+
+    try {
+      const slugList = createSpeciesSlugList(speciesList);
+      const data = await fetchJson(
+        `${API_BASE_URL}/pokemon-form?limit=${SPECIAL_FORM_FETCH_LIMIT}`
+      );
+      const forms = Array.isArray(data?.results) ? data.results : [];
+      const eligible = forms.filter((entry) => !shouldSkipSpecialFormName(entry?.name));
+      const collected = [];
+      const batchSize = 20;
+      for (let i = 0; i < eligible.length; i += batchSize) {
+        const batch = eligible.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map((entry) =>
+            processSpecialFormEntry(entry, {
+              slugLookup,
+              slugList,
+              collected,
+            })
+          )
+        );
+      }
+      await processSpecialFormVarieties(speciesList, { collected });
+      if (collected.length) {
+        writeSpecialFormCache(collected);
+      }
+    } catch (error) {
+      console.warn("Could not build special form catalog:", error);
+    }
+
+    specialFormsReady = true;
+  })();
+
+  await specialFormsPromise;
+}
+
+const HISUI_SPECIES_OVERRIDES = {
+  58: { form: "hisui" },
+  59: { form: "hisui" },
+  100: { form: "hisui" },
+  101: { form: "hisui" },
+  157: { form: "hisui" },
+  211: { form: "hisui" },
+  215: { form: "hisui" },
+  503: { form: "hisui" },
+  549: { form: "hisui" },
+  550: { form: "hisui" },
+  570: { form: "hisui" },
+  571: { form: "hisui" },
+  628: { form: "hisui" },
+  705: { form: "hisui" },
+  706: { form: "hisui" },
+  724: { form: "hisui" },
+};
+
 const GAME_CONFIG = [
   {
     id: "pokemon-home",
@@ -399,7 +782,7 @@ const GAME_CONFIG = [
       },
       {
         id: "home-mega",
-        name: "Mega Evoluties",
+        name: "Mega Evolutions",
         source: { type: "mega-forms" },
       },
       {
@@ -416,12 +799,21 @@ const GAME_CONFIG = [
       {
         id: "lumiose-city",
         name: "Lumiose City",
-        source: { 
-		  type: "pokedex",
-		  slugs: ["lumiose-city"],
-		},
+        source: {
+          type: "pokedex",
+          slugs: ["lumiose-city"],
+        },
       },
-	  {
+      {
+        id: "lumiose-alpha",
+        name: "Alpha Dex",
+        source: {
+          type: "pokedex",
+          slugs: ["lumiose-city"],
+          excludeSpecies: [150, 716, 717, 718, 719],
+        },
+      },
+      {
         id: "lumiose-regional",
         name: "Regional Variants",
         source: {
@@ -429,18 +821,18 @@ const GAME_CONFIG = [
           entries: [
             { speciesId: 26, variantRegionCode: "A" },
             { speciesId: 79, variantRegionCode: "G" },
-			{ speciesId: 80, variantRegionCode: "G" },
-			{ speciesId: 199, variantRegionCode: "G" },
-			{ speciesId: 618, variantRegionCode: "G" },
-			{ speciesId: 705, variantRegionCode: "H" },
-			{ speciesId: 706, variantRegionCode: "H" },
-			{ speciesId: 713, variantRegionCode: "H" },
+            { speciesId: 80, variantRegionCode: "G" },
+            { speciesId: 199, variantRegionCode: "G" },
+            { speciesId: 618, variantRegionCode: "G" },
+            { speciesId: 705, variantRegionCode: "H" },
+            { speciesId: 706, variantRegionCode: "H" },
+            { speciesId: 713, variantRegionCode: "H" },
           ],
         },
       },
       {
         id: "lumiose-mega",
-        name: "Mega Evoluties",
+        name: "Mega Evolutions",
         source: {
           type: "mega-forms",
           includeSpecies: [3, 6, 9, 15, 18, 36, 65, 71, 80, 94, 115, 121, 127, 130, 142, 149, 150, 154, 160, 181, 208, 212, 214, 227, 229, 248, 282, 302, 303, 306, 308, 310, 319, 323, 334, 354, 359, 362, 373, 376, 428, 445, 448, 460, 475, 478, 500, 530, 531, 545, 560, 604, 609, 652, 655, 658, 668, 670, 687, 689, 693, 701, 718, 719, 780, 870],
@@ -451,7 +843,7 @@ const GAME_CONFIG = [
         name: "All Pokémon",
         source: {
           type: "aggregate",
-          dexIds: ["lumiose-city", "lumiose-regional", "lumiose-mega"],
+          dexIds: ["lumiose-city", "lumiose-alpha", "lumiose-regional", "lumiose-mega"],
         },
       },
     ],
@@ -632,24 +1024,36 @@ const GAME_CONFIG = [
         source: {
           type: "pokedex",
           slugs: ["hisui"],
-          speciesOverrides: {
-            58: { form: "hisui" },
-            59: { form: "hisui" },
-            100: { form: "hisui" },
-            101: { form: "hisui" },
-            211: { form: "hisui" },
-            215: { form: "hisui" },
-            157: { form: "hisui" },
-            503: { form: "hisui" },
-            549: { form: "hisui" },
-            550: { form: "hisui" },
-            570: { form: "hisui" },
-            571: { form: "hisui" },
-            628: { form: "hisui" },
-            705: { form: "hisui" },
-            706: { form: "hisui" },
-            724: { form: "hisui" },
-          },
+          speciesOverrides: HISUI_SPECIES_OVERRIDES,
+        },
+      },
+      {
+        id: "hisui-alpha",
+        name: "Alpha Dex",
+        source: {
+          type: "pokedex",
+          slugs: ["hisui"],
+          speciesOverrides: HISUI_SPECIES_OVERRIDES,
+          excludeSpecies: [
+            480,
+            481,
+            482,
+            483,
+            484,
+            485,
+            486,
+            487,
+            488,
+            489,
+            490,
+            491,
+            492,
+            493,
+            641,
+            642,
+            645,
+            905,
+          ],
         },
       },
     ],
@@ -1071,7 +1475,7 @@ const GAME_CONFIG = [
       },
       {
         id: "lgpe-mega",
-        name: "Mega Evoluties",
+        name: "Mega Evolutions",
         source: {
           type: "mega-forms",
           includeSpecies: [3, 6, 9, 15, 18, 65, 80, 94, 115, 127, 130, 142, 150],
@@ -1103,7 +1507,7 @@ const GAME_CONFIG = [
       },
       {
         id: "sun-moon-mega",
-        name: "Mega Evoluties",
+        name: "Mega Evolutions",
         source: {
           type: "mega-forms",
           includeSpecies: [3, 6, 9, 15, 18, 65, 80, 94, 115, 127, 130, 142, 150, 181, 208, 212, 214, 229, 248, 254, 257, 260, 282, 302, 303, 306, 308, 310, 319, 323, 334, 354, 359, 362, 373, 376, 380, 381, 384, 428, 445, 448, 460, 475, 531, 719],
@@ -1127,7 +1531,7 @@ const GAME_CONFIG = [
       },
       {
         id: "sun-moon-mega",
-        name: "Mega Evoluties",
+        name: "Mega Evolutions",
         source: {
           type: "mega-forms",
           includeSpecies: [3, 6, 9, 15, 18, 65, 80, 94, 115, 127, 130, 142, 150, 181, 208, 212, 214, 229, 248, 254, 257, 260, 282, 302, 303, 306, 308, 310, 319, 323, 334, 354, 359, 362, 373, 376, 380, 381, 384, 428, 445, 448, 460, 475, 531, 719],
@@ -1146,7 +1550,7 @@ const GAME_CONFIG = [
       },
       {
         id: "sun-moon-mega",
-        name: "Mega Evoluties",
+        name: "Mega Evolutions",
         source: {
           type: "mega-forms",
           includeSpecies: [3, 6, 9, 15, 18, 65, 80, 94, 115, 127, 130, 142, 150, 181, 208, 212, 214, 229, 248, 254, 257, 260, 282, 302, 303, 306, 308, 310, 319, 323, 334, 354, 359, 362, 373, 376, 380, 381, 384, 428, 445, 448, 460, 475, 531, 719],
@@ -1185,7 +1589,7 @@ const GAME_CONFIG = [
       },
       {
         id: "sun-moon-mega",
-        name: "Mega Evoluties",
+        name: "Mega Evolutions",
         source: {
           type: "mega-forms",
           includeSpecies: [3, 6, 9, 65, 94, 115, 127, 130, 142, 150, 181, 212, 214, 229, 248, 257, 282, 303, 306, 308, 310, 354, 359, 380, 381, 445, 448, 460],
@@ -1358,10 +1762,460 @@ const GAME_CONFIG = [
   },
 ];
 
+GAME_CONFIG.forEach((game) => {
+  if (!game || !Array.isArray(game.dexes)) return;
+  const alreadyHasSpecial = game.dexes.some(
+    (dex) => dex?.source?.type === "special-forms"
+  );
+  if (alreadyHasSpecial) return;
+  game.dexes.push({
+    id: `${game.id}-special-forms`,
+    name: "Special Forms",
+    source: { type: "special-forms" },
+  });
+});
+
+const VERSION_EXCLUSIVES_BY_DEX = {};
+
+const VERSION_EXCLUSIVES_BY_GAME = {
+  "scarlet-violet": {
+    scarlet: [
+      "larvitar",
+      "pupitar",
+      "tyranitar",
+      "drifloon",
+      "drifblim",
+      "stunky",
+      "skuntank",
+      "skrelp",
+      "dragalge",
+      "oranguru",
+      "stonjourner",
+      "armarouge",
+      "great-tusk",
+      "scream-tail",
+      "brute-bonnet",
+      "flutter-mane",
+      "slither-wing",
+      "sandy-shocks",
+      "roaring-moon",
+      "koraidon",
+      "walking-wake",
+      "gouging-fire",
+      "raging-bolt",
+    ],
+    violet: [
+      "misdreavus",
+      "mismagius",
+      "gulpin",
+      "swalot",
+      "bagon",
+      "shelgon",
+      "salamence",
+      "deino",
+      "zweilous",
+      "hydreigon",
+      "clauncher",
+      "clawitzer",
+      "passimian",
+      "eiscue",
+      "ceruledge",
+      "iron-treads",
+      "iron-bundle",
+      "iron-hands",
+      "iron-jugulis",
+      "iron-moth",
+      "iron-thorns",
+      "iron-valiant",
+      "miraidon",
+      "iron-leaves",
+      "iron-boulder",
+      "iron-crown",
+    ],
+  },
+  "sword-shield": {
+    sword: [
+      "seedot",
+      "nuzleaf",
+      "shiftry",
+      "mawile",
+      "solrock",
+      "zacian",
+      "deino",
+      "zweilous",
+      "hydreigon",
+      "jangmo-o",
+      "hakamo-o",
+      "kommo-o",
+      "farfetchd",
+      "sirfetchd",
+      "darumaka",
+      "darmanitan",
+      "scraggy",
+      "scrafty",
+      "gothita",
+      "gothorita",
+      "gothitelle",
+      "rufflet",
+      "braviary",
+      "passimian",
+      "stonjourner",
+      "sawk",
+      "turtonator",
+      "flapple",
+      "swirlix",
+      "slurpuff",
+      "bagon",
+      "shelgon",
+      "salamence",
+      "heracross",
+      "karrablast",
+      "escavalier",
+      "clauncher",
+      "clawitzer",
+      "ho-oh",
+      "latios",
+      "groudon",
+      "dialga",
+      "heatran",
+      "reshiram",
+      "tornadus",
+      "xerneas",
+    ],
+    shield: [
+      "lotad",
+      "lombre",
+      "ludicolo",
+      "sableye",
+      "lunatone",
+      "zamazenta",
+      "larvitar",
+      "pupitar",
+      "tyranitar",
+      "goomy",
+      "sliggoo",
+      "goodra",
+      "ponyta",
+      "rapidash",
+      "corsola",
+      "cursola",
+      "zigzagoon",
+      "linoone",
+      "obstagoon",
+      "drampa",
+      "vullaby",
+      "mandibuzz",
+      "oranguru",
+      "eiscue",
+      "throh",
+      "appletun",
+      "spritzee",
+      "aromatisse",
+      "solosis",
+      "duosion",
+      "reuniclus",
+      "pinsir",
+      "shelmet",
+      "accelgor",
+      "skrelp",
+      "dragalge",
+      "gible",
+      "gabite",
+      "garchomp",
+      "lugia",
+      "latias",
+      "kyogre",
+      "palkia",
+      "zekrom",
+      "thundurus",
+      "yveltal",
+    ],
+  },
+  "lets-go": {
+    "lets-go-pikachu": [
+      "oddish",
+      "gloom",
+      "vileplume",
+      "sandshrew",
+      "sandslash",
+      "growlithe",
+      "arcanine",
+      "grimer",
+      "muk",
+      "scyther",
+    ],
+    "lets-go-eevee": [
+      "bellsprout",
+      "weepinbell",
+      "victreebel",
+      "vulpix",
+      "ninetales",
+      "meowth",
+      "persian",
+      "koffing",
+      "weezing",
+      "pinsir",
+    ],
+  },
+  "brilliant-diamond-pearl": {
+    "brilliant-diamond": [
+      "seel",
+      "dewgong",
+      "scyther",
+      "scizor",
+      "murkrow",
+      "honchkrow",
+      "aron",
+      "lairon",
+      "aggron",
+      "larvitar",
+      "pupitar",
+      "tyranitar",
+      "cranidos",
+      "rampardos",
+      "stunky",
+      "skuntank",
+      "dialga",
+    ],
+    "shining-pearl": [
+      "slowpoke",
+      "slowbro",
+      "slowking",
+      "pinsir",
+      "misdreavus",
+      "mismagius",
+      "houndour",
+      "houndoom",
+      "shieldon",
+      "bastiodon",
+      "glameow",
+      "purugly",
+      "magby",
+      "magmar",
+      "magmortar",
+      "palkia",
+    ],
+  },
+  "diamond-pearl": {
+    diamond: [
+      "seel",
+      "dewgong",
+      "scyther",
+      "scizor",
+      "murkrow",
+      "honchkrow",
+      "aron",
+      "lairon",
+      "aggron",
+      "larvitar",
+      "pupitar",
+      "tyranitar",
+      "cranidos",
+      "rampardos",
+      "stunky",
+      "skuntank",
+      "dialga",
+    ],
+    pearl: [
+      "slowpoke",
+      "slowbro",
+      "slowking",
+      "pinsir",
+      "misdreavus",
+      "mismagius",
+      "houndour",
+      "houndoom",
+      "shieldon",
+      "bastiodon",
+      "glameow",
+      "purugly",
+      "magby",
+      "magmar",
+      "magmortar",
+      "palkia",
+    ],
+  },
+  "omega-ruby-alpha-sapphire": {
+    "omega-ruby": [
+      "seedot",
+      "nuzleaf",
+      "shiftry",
+      "mawile",
+      "zangoose",
+      "solrock",
+      "plusle",
+      "volbeat",
+      "groudon",
+      "latios",
+      "ho-oh",
+      "reshiram",
+      "dialga",
+      "tornadus",
+    ],
+    "alpha-sapphire": [
+      "lotad",
+      "lombre",
+      "ludicolo",
+      "sableye",
+      "seviper",
+      "lunatone",
+      "minun",
+      "illumise",
+      "kyogre",
+      "latias",
+      "lugia",
+      "zekrom",
+      "palkia",
+      "thundurus",
+    ],
+  },
+  "ruby-sapphire": {
+    ruby: [
+      "seedot",
+      "nuzleaf",
+      "shiftry",
+      "mawile",
+      "zangoose",
+      "solrock",
+      "plusle",
+      "volbeat",
+      "groudon",
+      "latios",
+    ],
+    sapphire: [
+      "lotad",
+      "lombre",
+      "ludicolo",
+      "sableye",
+      "seviper",
+      "lunatone",
+      "minun",
+      "illumise",
+      "kyogre",
+      "latias",
+    ],
+  },
+  "firered-leafgreen": {
+    "fire-red": [
+      "ekans",
+      "arbok",
+      "oddish",
+      "gloom",
+      "vileplume",
+      "psyduck",
+      "golduck",
+      "growlithe",
+      "arcanine",
+      "shellder",
+      "cloyster",
+      "scyther",
+      "electabuzz",
+    ],
+    "leaf-green": [
+      "sandshrew",
+      "sandslash",
+      "vulpix",
+      "ninetales",
+      "bellsprout",
+      "weepinbell",
+      "victreebel",
+      "meowth",
+      "persian",
+      "slowpoke",
+      "slowbro",
+      "pinsir",
+      "magmar",
+    ],
+  },
+  "heartgold-soulsilver": {
+    heartgold: [
+      "mankey",
+      "primeape",
+      "growlithe",
+      "arcanine",
+      "spinarak",
+      "ariados",
+      "gligar",
+      "teddiursa",
+      "ursaring",
+      "mantine",
+    ],
+    soulsilver: [
+      "vulpix",
+      "ninetales",
+      "meowth",
+      "persian",
+      "ledyba",
+      "ledian",
+      "skarmory",
+      "phanpy",
+      "donphan",
+      "delibird",
+    ],
+  },
+  "gold-silver-crystal": {
+    gold: [
+      "mankey",
+      "primeape",
+      "growlithe",
+      "arcanine",
+      "spinarak",
+      "ariados",
+      "gligar",
+      "teddiursa",
+      "ursaring",
+      "mantine",
+    ],
+    silver: [
+      "vulpix",
+      "ninetales",
+      "meowth",
+      "persian",
+      "ledyba",
+      "ledian",
+      "skarmory",
+      "phanpy",
+      "donphan",
+      "delibird",
+    ],
+  },
+  "red-blue-yellow": {
+    red: [
+      "ekans",
+      "arbok",
+      "oddish",
+      "gloom",
+      "vileplume",
+      "mankey",
+      "primeape",
+      "growlithe",
+      "arcanine",
+      "scyther",
+      "electabuzz",
+    ],
+    blue: [
+      "sandshrew",
+      "sandslash",
+      "vulpix",
+      "ninetales",
+      "meowth",
+      "persian",
+      "bellsprout",
+      "weepinbell",
+      "victreebel",
+      "magmar",
+      "pinsir",
+    ],
+  },
+};
+
+let speciesSlugLookup = null;
+const normalizedVersionExclusiveCache = new WeakMap();
+
 async function fetchJson(url) {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Aanvraag naar ${url} mislukte met status ${response.status}`);
+    throw new Error(`Request to ${url} failed with status ${response.status}`);
   }
   return response.json();
 }
@@ -1387,6 +2241,106 @@ function formatSpeciesName(apiName) {
     .join(" ");
 }
 
+function slugifySpeciesName(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[♀]/g, "-f")
+    .replace(/[♂]/g, "-m")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function normalizeSpeciesSlug(value) {
+  if (value === null || value === undefined) return null;
+  return slugifySpeciesName(value);
+}
+
+function createSpeciesSlugMap(species = []) {
+  const map = new Map();
+  species.forEach((entry) => {
+    if (!entry || !entry.id) return;
+    const slugCandidates = [entry.slug, slugifySpeciesName(entry.name)];
+    slugCandidates.forEach((candidate) => {
+      const normalized = normalizeSpeciesSlug(candidate);
+      if (normalized && !map.has(normalized)) {
+        map.set(normalized, entry);
+      }
+    });
+  });
+  return map;
+}
+
+function getSpeciesFromSlugLookup(slugLookup, slug) {
+  if (!slugLookup || !slug) return null;
+  const normalized = normalizeSpeciesSlug(slug);
+  if (!normalized) return null;
+  const match = slugLookup.get(normalized) || slugLookup.get(slug);
+  if (!match) return null;
+  if (typeof match === "object" && match.id) {
+    return match;
+  }
+  if (Number.isFinite(Number(match))) {
+    return { id: Number(match), slug: normalized };
+  }
+  return null;
+}
+
+function resolveSpeciesIdFromIdentifier(identifier) {
+  if (typeof identifier === "number" && Number.isFinite(identifier)) {
+    return identifier;
+  }
+  if (typeof identifier === "string") {
+    if (!identifier.trim()) return null;
+    const numeric = Number(identifier);
+    if (Number.isFinite(numeric)) {
+      return numeric;
+    }
+    const normalized = normalizeSpeciesSlug(identifier);
+    if (normalized && speciesSlugLookup && speciesSlugLookup.has(normalized)) {
+      const mapped = speciesSlugLookup.get(normalized);
+      if (mapped && typeof mapped === "object") {
+        return mapped.id;
+      }
+      return mapped;
+    }
+  }
+  return null;
+}
+
+function normalizeVersionExclusiveConfig(config) {
+  if (!config) return null;
+  if (normalizedVersionExclusiveCache.has(config)) {
+    return normalizedVersionExclusiveCache.get(config);
+  }
+  const normalized = {};
+  Object.entries(config).forEach(([version, identifiers]) => {
+    const list = Array.isArray(identifiers) ? identifiers : [];
+    const ids = [];
+    list.forEach((value) => {
+      const speciesId = resolveSpeciesIdFromIdentifier(value);
+      if (!speciesId) {
+        if (value !== null && value !== undefined) {
+          console.warn(
+            `Could not map version-exclusive entry '${value}' to a species.`
+          );
+        }
+        return;
+      }
+      if (!ids.includes(speciesId)) {
+        ids.push(speciesId);
+      }
+    });
+    if (ids.length) {
+      normalized[version] = ids;
+    }
+  });
+  normalizedVersionExclusiveCache.set(config, normalized);
+  return normalized;
+}
+
 async function loadAllSpecies() {
   const species = [];
   const seen = new Set();
@@ -1400,7 +2354,7 @@ async function loadAllSpecies() {
         return;
       }
       seen.add(id);
-      species.push({ id, name: formatSpeciesName(result.name) });
+      species.push({ id, name: formatSpeciesName(result.name), slug: result.name });
     });
     nextUrl = data.next;
   }
@@ -1456,7 +2410,7 @@ function buildDexEntry(options, speciesById) {
 
   const species = speciesById.get(speciesId);
   if (!species) {
-    console.warn(`Pokémon met id ${speciesId} ontbreekt in de species lijst.`);
+    console.warn(`Pokémon with id ${speciesId} is missing from the species list.`);
     return null;
   }
 
@@ -1539,11 +2493,11 @@ async function fetchPokedexEntries(slugs) {
       }
       return pokedexCache.get(slug);
     } catch (error) {
-      console.warn(`Kon Pokédex '${slug}' niet laden:`, error);
+      console.warn(`Could not load Pokédex '${slug}':`, error);
     }
   }
 
-  throw new Error(`Geen Pokédex data gevonden voor slugs: ${slugs.join(", ")}`);
+  throw new Error(`No Pokédex data found for slugs: ${slugs.join(", ")}`);
 }
 
 async function fetchVersionGroupSpecies(slugs = []) {
@@ -1567,7 +2521,7 @@ async function fetchVersionGroupSpecies(slugs = []) {
         }
       });
     } catch (error) {
-      console.warn(`Kon version group '${slug}' niet laden:`, error);
+      console.warn(`Could not load version group '${slug}':`, error);
     }
   }
 
@@ -1711,7 +2665,7 @@ async function createDexEntries(source, speciesById, allSpecies, context = {}) {
 
   if (source.type === "pokedex") {
     const entries = await fetchPokedexEntries(source.slugs || []);
-    const results = entries
+    let results = entries
       .map(({ speciesId, entryNumber }) => {
         const speciesOverride = getOverride(source.speciesOverrides, speciesId) || {};
         const entryOverride = getOverride(source.entryOverrides, entryNumber) || {};
@@ -1743,7 +2697,7 @@ async function createDexEntries(source, speciesById, allSpecies, context = {}) {
           }
           if (!speciesId) {
             console.warn(
-              "Handmatige Pokédex-entry mist een geldige speciesId en wordt overgeslagen."
+              "Manual Pokédex entry is missing a valid speciesId and will be skipped."
             );
             return null;
           }
@@ -1765,6 +2719,11 @@ async function createDexEntries(source, speciesById, allSpecies, context = {}) {
         })
         .filter(Boolean);
       results.push(...manual);
+    }
+
+    if (Array.isArray(source.excludeSpecies) && source.excludeSpecies.length) {
+      const excludeSet = new Set(source.excludeSpecies.map(Number));
+      results = results.filter((entry) => !excludeSet.has(Number(entry.speciesId)));
     }
 
     return sortDexEntries(results);
@@ -1900,6 +2859,71 @@ async function createDexEntries(source, speciesById, allSpecies, context = {}) {
       .filter(Boolean);
   }
 
+  if (source.type === "special-forms") {
+    const existingDexEntries = context.existingDexEntries || new Map();
+    const includeSpecies = new Set(
+      (Array.isArray(source.includeSpecies) ? source.includeSpecies : [])
+        .map((entry) => (typeof entry === "number" ? entry : entry?.speciesId))
+        .filter((value) => Number.isFinite(Number(value)))
+        .map(Number)
+    );
+
+    if (Array.isArray(source.derivedDexIds) && source.derivedDexIds.length) {
+      source.derivedDexIds.forEach((dexId) => {
+        const entries = existingDexEntries.get(dexId) || [];
+        entries.forEach((entry) => includeSpecies.add(Number(entry.speciesId)));
+      });
+    }
+
+    if (!includeSpecies.size) {
+      existingDexEntries.forEach((entries, dexId) => {
+        if (Array.isArray(source.excludeDexIds) && source.excludeDexIds.includes(dexId)) {
+          return;
+        }
+        entries.forEach((entry) => includeSpecies.add(Number(entry.speciesId)));
+      });
+    }
+
+    let variants = ALL_VARIANTS.filter((variant) => variant.category === "special");
+    if (includeSpecies.size) {
+      variants = variants.filter((variant) => includeSpecies.has(Number(variant.speciesId)));
+    }
+
+    if (Array.isArray(source.excludeSpecies) && source.excludeSpecies.length) {
+      const excludeSet = new Set(source.excludeSpecies.map(Number));
+      variants = variants.filter((variant) => !excludeSet.has(Number(variant.speciesId)));
+    }
+
+    variants.sort((a, b) => {
+      if (a.speciesId !== b.speciesId) {
+        return a.speciesId - b.speciesId;
+      }
+      return (a.form || "").localeCompare(b.form || "");
+    });
+
+    return variants
+      .map((variant, index) => {
+        const definition = createEntryDefinition(
+          variant.speciesId,
+          {
+            form: variant.form,
+            nameOverride: variant.name,
+            spriteOverride: variant.sprite,
+            spriteSlugOverride: variant.formSlug,
+            regionCodeOverride: variant.regionCode,
+            catchKeyOverride: variant.key,
+            pokemonId: variant.pokemonId,
+            pokemonSlug: variant.pokemonSlug,
+            dexNumber: index + 1,
+            sortIndex: index + 1,
+          },
+          index + 1
+        );
+        return buildDexEntry(definition, speciesById);
+      })
+      .filter(Boolean);
+  }
+
   if (source.type === "manual") {
     const entries = source.entries || [];
     return sortDexEntries(
@@ -1909,7 +2933,7 @@ async function createDexEntries(source, speciesById, allSpecies, context = {}) {
             if (!entry) return null;
             const speciesId = entry.speciesId ?? entry.id ?? null;
             if (!speciesId) {
-              console.warn("Handmatige lijst-entry mist speciesId en wordt overgeslagen.");
+              console.warn("Manual list entry is missing a speciesId and will be skipped.");
               return null;
             }
             const fallbackNumber = entry.dexNumber ?? index + 1;
@@ -2073,7 +3097,7 @@ async function fetchPokemonResource(identifier) {
     pokemonResourceCache.set(key, data);
     return data;
   } catch (error) {
-    console.warn(`Kon pokemon resource '${key}' niet laden:`, error);
+    console.warn(`Could not load Pokémon resource '${key}':`, error);
     pokemonResourceCache.set(key, null);
     return null;
   }
@@ -2090,7 +3114,7 @@ async function fetchSpeciesResource(speciesId) {
     speciesResourceCache.set(key, data);
     return data;
   } catch (error) {
-    console.warn(`Kon species resource '${key}' niet laden:`, error);
+    console.warn(`Could not load species resource '${key}':`, error);
     speciesResourceCache.set(key, null);
     return null;
   }
@@ -2106,14 +3130,14 @@ async function fetchEvolutionChainData(url) {
     evolutionChainCache.set(url, data);
     return data;
   } catch (error) {
-    console.warn(`Kon evolutieketen '${url}' niet laden:`, error);
+    console.warn(`Could not load evolution chain '${url}':`, error);
     evolutionChainCache.set(url, null);
     return null;
   }
 }
 
 function describeEncounterDetail(detail) {
-  if (!detail) return "Standaard";
+  if (!detail) return "Standard";
   const parts = [];
   const methodName = detail.method?.name;
   if (methodName) {
@@ -2139,44 +3163,44 @@ function describeEncounterDetail(detail) {
     parts.push(toTitleCase(detail.time_of_day));
   }
   if (detail.needs_overworld_rain) {
-    parts.push("Regen");
+    parts.push("While raining");
   }
   if (detail.turn_upside_down) {
-    parts.push("Keer console om");
+    parts.push("Turn the console upside down");
   }
   if (detail.relative_physical_stats !== null && detail.relative_physical_stats !== undefined) {
     const value = Number(detail.relative_physical_stats);
-    if (value > 0) parts.push("Aanval > Verdediging");
-    if (value === 0) parts.push("Aanval = Verdediging");
-    if (value < 0) parts.push("Aanval < Verdediging");
+    if (value > 0) parts.push("Attack > Defense");
+    if (value === 0) parts.push("Attack = Defense");
+    if (value < 0) parts.push("Attack < Defense");
   }
   if (detail.party_type) {
-    parts.push(`Partijtype: ${formatTypeLabel(detail.party_type.name)}`);
+    parts.push(`Party type: ${formatTypeLabel(detail.party_type.name)}`);
   }
   if (detail.party_species) {
-    parts.push(`Partij Pokémon: ${formatSpeciesName(detail.party_species.name)}`);
+    parts.push(`Party Pokémon: ${formatSpeciesName(detail.party_species.name)}`);
   }
   if (detail.held_item) {
-    parts.push(`Houd ${toTitleCase(detail.held_item.name)}`);
+    parts.push(`Hold ${toTitleCase(detail.held_item.name)}`);
   }
   if (detail.item) {
-    parts.push(`Gebruik ${toTitleCase(detail.item.name)}`);
+    parts.push(`Use ${toTitleCase(detail.item.name)}`);
   }
   if (detail.known_move) {
-    parts.push(`Kent ${toTitleCase(detail.known_move.name)}`);
+    parts.push(`Knows ${toTitleCase(detail.known_move.name)}`);
   }
   if (detail.known_move_type) {
-    parts.push(`Met type ${formatTypeLabel(detail.known_move_type.name)}`);
+    parts.push(`Of type ${formatTypeLabel(detail.known_move_type.name)}`);
   }
   if (detail.location) {
-    parts.push(`Bij ${toTitleCase(detail.location.name)}`);
+    parts.push(`At ${toTitleCase(detail.location.name)}`);
   }
   if (detail.gender === 1) {
-    parts.push("Vrouwelijk");
+    parts.push("Female");
   } else if (detail.gender === 2) {
-    parts.push("Mannelijk");
+    parts.push("Male");
   }
-  return parts.join(" • ") || "Standaard";
+  return parts.join(" • ") || "Standard";
 }
 
 async function fetchEncounterData(url) {
@@ -2188,7 +3212,7 @@ async function fetchEncounterData(url) {
     const data = await fetchJson(url);
     const versionMap = new Map();
     (Array.isArray(data) ? data : []).forEach((entry) => {
-      const locationName = entry.location_area?.name || "onbekend";
+      const locationName = entry.location_area?.name || "unknown";
       (entry.version_details || []).forEach((detail) => {
         const version = detail.version?.name;
         if (!version) return;
@@ -2208,7 +3232,7 @@ async function fetchEncounterData(url) {
             }
           });
         } else if (!methods.length) {
-          methods.push("Standaard");
+          methods.push("Standard");
         }
       });
     });
@@ -2222,12 +3246,12 @@ async function fetchEncounterData(url) {
           methods,
         })),
       }))
-      .sort((a, b) => a.versionName.localeCompare(b.versionName, "nl", { sensitivity: "base" }));
+      .sort((a, b) => a.versionName.localeCompare(b.versionName, "en", { sensitivity: "base" }));
 
     encounterCache.set(url, formatted);
     return formatted;
   } catch (error) {
-    console.warn(`Kon encounters van '${url}' niet laden:`, error);
+    console.warn(`Could not load encounters from '${url}':`, error);
     encounterCache.set(url, []);
     return [];
   }
@@ -2246,77 +3270,77 @@ function extractTypesFromPokemon(pokemonData) {
 }
 
 function describeEvolutionDetail(detail) {
-  if (!detail) return "Speciale methode";
+  if (!detail) return "Special requirement";
   const parts = [];
   const trigger = detail.trigger?.name || "";
   if (trigger === "level-up") {
     if (detail.min_level) {
-      parts.push(`Bereik level ${detail.min_level}`);
+      parts.push(`Reach level ${detail.min_level}`);
     } else {
-      parts.push("Level omhoog");
+      parts.push("Level up");
     }
   } else if (trigger === "trade") {
-    parts.push("Ruil");
+    parts.push("Trade");
   } else if (trigger === "use-item" && detail.item) {
-    parts.push(`Gebruik ${toTitleCase(detail.item.name)}`);
+    parts.push(`Use ${toTitleCase(detail.item.name)}`);
   } else if (trigger) {
     parts.push(toTitleCase(trigger));
   }
 
   if (detail.held_item) {
-    parts.push(`Houd ${toTitleCase(detail.held_item.name)}`);
+    parts.push(`Hold ${toTitleCase(detail.held_item.name)}`);
   }
   if (detail.location) {
-    parts.push(`Bij ${toTitleCase(detail.location.name)}`);
+    parts.push(`At ${toTitleCase(detail.location.name)}`);
   }
   if (detail.time_of_day) {
     parts.push(toTitleCase(detail.time_of_day));
   }
   if (detail.min_happiness) {
-    parts.push(`Vriendschap ${detail.min_happiness}+`);
+    parts.push(`Friendship ${detail.min_happiness}+`);
   }
   if (detail.min_affection) {
-    parts.push(`Genegenheid ${detail.min_affection}+`);
+    parts.push(`Affection ${detail.min_affection}+`);
   }
   if (detail.min_beauty) {
-    parts.push(`Schoonheid ${detail.min_beauty}+`);
+    parts.push(`Beauty ${detail.min_beauty}+`);
   }
   if (detail.min_level && trigger !== "level-up") {
     parts.push(`Level ${detail.min_level}`);
   }
   if (detail.needs_overworld_rain) {
-    parts.push("Regen");
+    parts.push("While raining");
   }
   if (detail.turn_upside_down) {
-    parts.push("Keer console om");
+    parts.push("Turn the console upside down");
   }
   if (detail.gender === 1) {
-    parts.push("Vrouwelijk");
+    parts.push("Female");
   } else if (detail.gender === 2) {
-    parts.push("Mannelijk");
+    parts.push("Male");
   }
   if (detail.relative_physical_stats !== null && detail.relative_physical_stats !== undefined) {
     const value = Number(detail.relative_physical_stats);
-    if (value > 0) parts.push("Aanval > Verdediging");
-    if (value === 0) parts.push("Aanval = Verdediging");
-    if (value < 0) parts.push("Aanval < Verdediging");
+    if (value > 0) parts.push("Attack > Defense");
+    if (value === 0) parts.push("Attack = Defense");
+    if (value < 0) parts.push("Attack < Defense");
   }
   if (detail.known_move) {
-    parts.push(`Kent ${toTitleCase(detail.known_move.name)}`);
+    parts.push(`Knows ${toTitleCase(detail.known_move.name)}`);
   }
   if (detail.known_move_type) {
-    parts.push(`Met type ${formatTypeLabel(detail.known_move_type.name)}`);
+    parts.push(`Of type ${formatTypeLabel(detail.known_move_type.name)}`);
   }
   if (detail.party_species) {
-    parts.push(`Partij Pokémon: ${formatSpeciesName(detail.party_species.name)}`);
+    parts.push(`Party Pokémon: ${formatSpeciesName(detail.party_species.name)}`);
   }
   if (detail.party_type) {
-    parts.push(`Partijtype: ${formatTypeLabel(detail.party_type.name)}`);
+    parts.push(`Party type: ${formatTypeLabel(detail.party_type.name)}`);
   }
   if (detail.trade_species) {
-    parts.push(`Ruil met ${formatSpeciesName(detail.trade_species.name)}`);
+    parts.push(`Trade with ${formatSpeciesName(detail.trade_species.name)}`);
   }
-  return parts.join(" • ") || "Speciale methode";
+  return parts.join(" • ") || "Special requirement";
 }
 
 function buildEvolutionSteps(chainData, targetSpeciesId) {
@@ -2334,7 +3358,7 @@ function buildEvolutionSteps(chainData, targetSpeciesId) {
     if (parent) {
       const details = Array.isArray(node.evolution_details) && node.evolution_details.length
         ? node.evolution_details.map(describeEvolutionDetail)
-        : ["Speciale methode"];
+        : ["Special requirement"];
       steps.push({
         from: {
           id: parent.speciesId,
@@ -2411,6 +3435,8 @@ async function getPokemonDetails(entry) {
   const sprites = {
     default: pokemonData.sprites?.front_default || null,
     shiny: pokemonData.sprites?.front_shiny || null,
+    female: pokemonData.sprites?.front_female || null,
+    shinyFemale: pokemonData.sprites?.front_shiny_female || null,
     artwork:
       pokemonData.sprites?.other?.["official-artwork"]?.front_default ||
       pokemonData.sprites?.other?.["official-artwork"]?.front_shiny ||
@@ -2450,10 +3476,68 @@ async function getPokemonDetails(entry) {
 }
 
 
+function getVersionExclusiveConfig({ dexId, gameId } = {}) {
+  if (dexId) {
+    const direct = VERSION_EXCLUSIVES_BY_DEX[dexId] || VERSION_EXCLUSIVES_BY_DEX[String(dexId)];
+    if (direct) {
+      return normalizeVersionExclusiveConfig(direct);
+    }
+  }
+  if (gameId) {
+    const gameConfig =
+      VERSION_EXCLUSIVES_BY_GAME[gameId] || VERSION_EXCLUSIVES_BY_GAME[String(gameId)];
+    if (gameConfig) {
+      return normalizeVersionExclusiveConfig(gameConfig);
+    }
+  }
+  return null;
+}
+
+function annotateVersionExclusives(entries = [], options = {}) {
+  const config = getVersionExclusiveConfig(options);
+  if (!config) {
+    return { entries, versions: [] };
+  }
+  const versionIds = Object.keys(config).filter(
+    (version) => Array.isArray(config[version]) && config[version].length
+  );
+  if (!versionIds.length) {
+    return { entries, versions: [] };
+  }
+  const speciesVersionMap = new Map();
+  versionIds.forEach((versionId) => {
+    config[versionId].forEach((speciesId) => {
+      const key = String(speciesId);
+      if (!speciesVersionMap.has(key)) {
+        speciesVersionMap.set(key, new Set());
+      }
+      speciesVersionMap.get(key).add(versionId);
+    });
+  });
+  entries.forEach((entry) => {
+    const versions = speciesVersionMap.get(String(entry.speciesId));
+    entry.versionExclusive = versions ? Array.from(versions) : [];
+  });
+  return { entries, versions: versionIds };
+}
 
 async function loadPokedexData() {
-  await preloadVariantSprites();
   const species = await loadAllSpecies();
+  speciesSlugLookup = createSpeciesSlugMap(species);
+  await ensureSpecialFormsLoaded(species);
+  await preloadVariantSprites();
+  const variantDefinitions = Array.from(VARIANT_MAP.values()).map((variant) => ({
+    key: variant.key,
+    speciesId: variant.speciesId,
+    form: variant.form,
+    name: variant.name,
+    regionCode: variant.regionCode || null,
+    formSlug: variant.formSlug || null,
+    pokemonSlug: variant.pokemonSlug || null,
+    pokemonId: variant.pokemonId || null,
+    sprite: variant.sprite || null,
+    category: variant.category || null,
+  }));
   const speciesById = new Map(species.map((entry) => [entry.id, entry]));
 
   const games = [];
@@ -2467,20 +3551,38 @@ async function loadPokedexData() {
         species,
         {
           gameId: game.id,
+          dexId: dex.id,
           existingDexEntries,
         }
       );
-      dexes.push({ id: dex.id, name: dex.name, entries });
+      const isSpecialFormsDex = dex.source?.type === "special-forms";
+      if (!entries.length && isSpecialFormsDex) {
+        existingDexEntries.set(dex.id, entries);
+        continue;
+      }
+      const { entries: annotatedEntries, versions } = annotateVersionExclusives(
+        entries,
+        { dexId: dex.id, gameId: game.id }
+      );
+      dexes.push({
+        id: dex.id,
+        name: dex.name,
+        entries: annotatedEntries,
+        versions,
+      });
       existingDexEntries.set(dex.id, entries);
     }
     games.push({ id: game.id, name: game.name, dexes });
   }
 
   const megaFormsBySpecies = groupVariantsBySpecies(
-    ALL_VARIANTS.filter((variant) => variant.category === "mega")
+    variantDefinitions.filter((variant) => variant.category === "mega")
   );
   const gmaxFormsBySpecies = groupVariantsBySpecies(
-    ALL_VARIANTS.filter((variant) => variant.category === "gmax")
+    variantDefinitions.filter((variant) => variant.category === "gmax")
+  );
+  const specialFormsBySpecies = groupVariantsBySpecies(
+    variantDefinitions.filter((variant) => variant.category === "special")
   );
 
   return {
@@ -2493,17 +3595,8 @@ async function loadPokedexData() {
     variants: {
       mega: megaFormsBySpecies,
       gmax: gmaxFormsBySpecies,
-      all: ALL_VARIANTS.map((variant) => ({
-        speciesId: variant.speciesId,
-        form: variant.form,
-        name: variant.name,
-        regionCode: variant.regionCode || null,
-        formSlug: variant.formSlug || null,
-        pokemonSlug: variant.pokemonSlug || null,
-        pokemonId: variant.pokemonId || null,
-        sprite: variant.sprite || null,
-        category: variant.category || null,
-      })),
+      special: specialFormsBySpecies,
+      all: variantDefinitions,
     },
   };
 }
