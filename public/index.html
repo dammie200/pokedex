@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -11,19 +11,18 @@
       <div class="app-header__title">
         <h1>Living Dex Tracker</h1>
         <p class="tagline">
-          Kies een spel, bekijk de juiste Pokédex en houd interactief bij welke
-          Pokémon je hebt gevangen.
+          Pick a game, open the right Pokédex, and interactively track every Pokémon you have caught.
         </p>
       </div>
     </header>
 
     <main class="app-main">
-      <section class="controls" aria-label="Dex instellingen">
+      <section class="controls" aria-label="Dex settings">
         <div class="controls__top">
           <div class="control-group control-group--primary">
             <label class="control" for="game-select">
-              <span>Spel</span>
-              <select id="game-select" name="game-select" aria-label="Selecteer spel"></select>
+              <span>Game</span>
+              <select id="game-select" name="game-select" aria-label="Select game"></select>
             </label>
 
             <label class="control" for="dex-select">
@@ -31,17 +30,17 @@
               <select
                 id="dex-select"
                 name="dex-select"
-                aria-label="Selecteer Pokédex"
+                aria-label="Select Pokédex"
               ></select>
             </label>
 
             <label class="control" for="search-input">
-              <span>Zoek Pokémon</span>
+              <span>Search Pokémon</span>
               <input
                 type="search"
                 id="search-input"
                 name="search-input"
-                placeholder="Bijv. Pikachu"
+                placeholder="e.g. Pikachu"
                 autocomplete="off"
               />
             </label>
@@ -55,75 +54,71 @@
           >
             <span class="controls__collapse-icon" aria-hidden="true">▾</span>
             <span class="controls__collapse-text" id="controls-collapse-text">
-              Filters inklappen
+              Collapse filters
             </span>
           </button>
         </div>
 
         <div class="controls__collapsible" id="controls-collapsible">
           <label class="control control--full" for="game-notes">
-            <span>Notities voor dit spel</span>
+            <span>Notes for this game</span>
             <textarea
               id="game-notes"
               name="game-notes"
               rows="3"
-              placeholder="Bijvoorbeeld: team planning, ruil afspraken of exclusives"
+              placeholder="For example: team plans, trades, or exclusives"
             ></textarea>
           </label>
 
           <div class="control-group">
-            <fieldset class="control view-toggle" aria-label="Weergave">
-              <legend>Weergave</legend>
+            <fieldset class="control view-toggle" aria-label="View">
+              <legend>View</legend>
               <div class="toggle-buttons" role="group">
                 <button
                   type="button"
                   id="view-grid"
                   class="toggle-button is-active"
                   aria-pressed="true"
-                >
-                  Box
-                </button>
+                >Box grid</button>
                 <button
                   type="button"
                   id="view-compact"
                   class="toggle-button"
                   aria-pressed="false"
                 >
-                  Compacte box
+                  Compact grid
                 </button>
                 <button
                   type="button"
                   id="view-list"
                   class="toggle-button"
                   aria-pressed="false"
-                >
-                  Lijst
-                </button>
+                >List</button>
               </div>
             </fieldset>
 
             <label class="control" for="sort-select">
-              <span>Sorteer</span>
+              <span>Sort</span>
               <select id="sort-select" name="sort-select">
-                <option value="dex">Pokédex volgorde</option>
-                <option value="national">Nationaal nummer</option>
-                <option value="name">Naam A-Z</option>
+                <option value="dex">Pokédex order</option>
+                <option value="national">National number</option>
+                <option value="name">Name A–Z</option>
               </select>
             </label>
 
             <label class="control" for="caught-filter">
               <span>Status</span>
               <select id="caught-filter" name="caught-filter">
-                <option value="all">Alle</option>
-                <option value="caught">Gevangen</option>
-                <option value="uncaught">Niet gevangen</option>
+                <option value="all">All</option>
+                <option value="caught">Caught</option>
+                <option value="uncaught">Uncaught</option>
               </select>
             </label>
 
             <label class="control" for="box-input">
               <span>Box</span>
-              <div class="box-picker" role="group" aria-label="Box selectie">
-                <button type="button" id="previous-box" class="box-button" aria-label="Vorige box">
+              <div class="box-picker" role="group" aria-label="Box selection">
+                <button type="button" id="previous-box" class="box-button" aria-label="Previous box">
                   ◀
                 </button>
                 <span id="box-indicator" aria-live="polite">Box 1 / 1</span>
@@ -133,36 +128,36 @@
                   class="box-input"
                   min="1"
                   value="1"
-                  aria-label="Spring naar specifieke box"
+                  aria-label="Jump to specific box"
                 />
-                <button type="button" id="next-box" class="box-button" aria-label="Volgende box">
+                <button type="button" id="next-box" class="box-button" aria-label="Next box">
                   ▶
                 </button>
               </div>
             </label>
 
             <label class="control" for="special-filter" id="special-filter-control" hidden>
-              <span>Speciale vormen</span>
+              <span>Special forms</span>
               <select id="special-filter" name="special-filter">
-                <option value="all">Alle</option>
-                <option value="mega">Mega beschikbaar</option>
-                <option value="gmax">G-Max beschikbaar</option>
+                <option value="all">All</option>
+                <option value="mega">Mega available</option>
+                <option value="gmax">G-Max available</option>
               </select>
             </label>
           </div>
 
-          <div class="control-group control-group--actions" role="group" aria-label="Acties voor Pokédex">
+          <div class="control-group control-group--actions" role="group" aria-label="Pokédex actions">
             <button type="button" id="select-all" class="action-button">
-              Alles selecteren
+              Select all
             </button>
             <button type="button" id="clear-all" class="action-button">
-              Alles wissen
+              Clear all
             </button>
             <button type="button" id="export-data" class="action-button">
-              Data exporteren
+              Export data
             </button>
             <button type="button" id="import-data" class="action-button">
-              Data importeren
+              Import data
             </button>
             <button
               type="button"
@@ -174,24 +169,24 @@
             </button>
             <div class="action-button-group" id="sprite-mode-actions" hidden>
               <button type="button" id="show-default-sprites" class="action-button">
-                Standaard sprites
+                Default sprites
               </button>
               <button type="button" id="show-shiny-sprites" class="action-button">
-                Toon Shiny-sprites
+                Show shiny sprites
               </button>
               <button type="button" id="show-mega-sprites" class="action-button">
-                Toon Mega-sprites
+                Show Mega sprites
               </button>
               <button type="button" id="show-gmax-sprites" class="action-button">
-                Toon G-Max-sprites
+                Show G-Max sprites
               </button>
               <button type="button" id="show-nostalgia-sprites" class="action-button">
-                Maak nostalgisch
+                Show retro sprites
               </button>
             </div>
             <div class="gender-toggle" id="gender-sprite-toggle" hidden>
               <span class="gender-toggle__label">Gender sprite</span>
-              <div class="toggle-buttons" role="group" aria-label="Selecteer gender sprite">
+              <div class="toggle-buttons" role="group" aria-label="Select gender sprite">
                 <button
                   type="button"
                   id="show-gender-male"
@@ -199,7 +194,7 @@
                   aria-pressed="true"
                 >
                   ♂
-                  <span class="sr-only">Mannetje tonen</span>
+                  <span class="sr-only">Show male sprite</span>
                 </button>
                 <button
                   type="button"
@@ -208,7 +203,7 @@
                   aria-pressed="false"
                 >
                   ♀
-                  <span class="sr-only">Vrouwtje tonen</span>
+                  <span class="sr-only">Show female sprite</span>
                 </button>
               </div>
             </div>
@@ -216,15 +211,15 @@
         </div>
       </section>
 
-      <section class="dex" aria-label="Pokémon overzicht">
+      <section class="dex" aria-label="Pokémon overview">
         <div id="dex-progress" class="dex-progress" hidden>
-          <div id="dex-progress-text" class="dex-progress__text">0 / 0 gevangen</div>
+          <div id="dex-progress-text" class="dex-progress__text">0 / 0 caught</div>
           <progress
             id="dex-progress-bar"
             class="dex-progress__bar"
             value="0"
             max="0"
-            aria-label="Pokédex voortgang"
+            aria-label="Pokédex progress"
           >
             0%
           </progress>
@@ -234,7 +229,7 @@
           <div id="dex-list" class="dex-list" hidden>
             <div class="dex-list__header" role="row">
               <span class="dex-list__cell dex-list__cell--number">#</span>
-              <span class="dex-list__cell dex-list__cell--name">Naam</span>
+              <span class="dex-list__cell dex-list__cell--name">Name</span>
               <span class="dex-list__cell dex-list__cell--types">Types</span>
               <span class="dex-list__cell dex-list__cell--status">Status</span>
             </div>
@@ -257,17 +252,19 @@
           <span class="caught-indicator" aria-hidden="true">✔</span>
           <div class="pokemon-card__overlay">
             <div class="pokemon-card__top">
-          <span class="pokemon-number"></span>
-          <div class="pokemon-flag-bar">
-            <div class="pokemon-flags" data-flag-container hidden></div>
+              <span class="pokemon-number"></span>
+              <div class="pokemon-flag-bar">
+                <div class="pokemon-flags" data-flag-container hidden></div>
+              </div>
+              <div class="pokemon-special"></div>
+              <div class="pokemon-version-badges" data-version-badges hidden></div>
+            </div>
+            <span class="pokemon-name" role="button" tabindex="0"></span>
+            <div class="pokemon-types"></div>
           </div>
           <div class="pokemon-special"></div>
           <div class="pokemon-version-badges" data-version-badges hidden></div>
         </div>
-        <span class="pokemon-name" role="button" tabindex="0"></span>
-        <div class="pokemon-types"></div>
-      </div>
-    </div>
       </article>
     </template>
 
@@ -281,14 +278,14 @@
         </span>
         <span class="dex-list__cell dex-list__cell--types"></span>
         <span class="dex-list__cell dex-list__cell--status">
-          <button type="button" class="status-toggle">Markeer</button>
+          <button type="button" class="status-toggle">Toggle</button>
         </span>
       </div>
     </template>
 
     <dialog id="empty-results" class="empty-results">
-      <p>Geen Pokémon gevonden. Pas je filter aan.</p>
-      <button type="button" id="close-empty-results">Sluiten</button>
+      <p>No Pokémon found. Adjust your filters.</p>
+      <button type="button" id="close-empty-results">Close</button>
     </dialog>
 
     <dialog id="pokemon-details" class="pokemon-details" aria-modal="true">
@@ -297,7 +294,7 @@
           type="button"
           id="close-pokemon-details"
           class="pokemon-details__close"
-          aria-label="Sluit Pokémondetails"
+          aria-label="Close Pokémon details"
         >
           ✕
         </button>
@@ -313,16 +310,16 @@
             <h2 id="pokemon-detail-name" class="pokemon-details__name"></h2>
             <div id="pokemon-detail-types" class="pokemon-details__types"></div>
             <div id="pokemon-detail-versions" class="pokemon-details__versions" hidden>
-              <span class="pokemon-details__versions-label">Exclusief in:</span>
+              <span class="pokemon-details__versions-label">Exclusive to:</span>
               <div class="pokemon-version-badges" data-version-badges></div>
             </div>
             <dl class="pokemon-details__meta">
               <div>
-                <dt>Hoogte</dt>
+                <dt>Height</dt>
                 <dd id="pokemon-detail-height">-</dd>
               </div>
               <div>
-                <dt>Gewicht</dt>
+                <dt>Weight</dt>
                 <dd id="pokemon-detail-weight">-</dd>
               </div>
             </dl>
@@ -330,8 +327,12 @@
           </div>
         </header>
         <section class="pokemon-details__section">
-          <h3>Evolutie</h3>
+          <h3>Evolution</h3>
           <div id="pokemon-detail-evolution" class="pokemon-details__evolution"></div>
+        </section>
+        <section class="pokemon-details__section">
+          <h3>Variants</h3>
+          <div id="pokemon-detail-variants" class="pokemon-details__variants"></div>
         </section>
         <section class="pokemon-details__section">
           <h3>Varianten</h3>
@@ -342,8 +343,7 @@
 
     <footer class="app-footer">
       <p>
-        Je voortgang wordt lokaal opgeslagen in je browser. Pokédex gegevens
-        worden automatisch opgehaald via de PokéAPI.
+        Your progress is stored locally in your browser. Pokédex data is pulled automatically via PokéAPI.
       </p>
     </footer>
 

@@ -1074,6 +1074,7 @@ body::after {
 
 .pokemon-special {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 0.3rem;
 }
 
@@ -1117,6 +1118,12 @@ body::after {
   color: #7c1232;
 }
 
+.special-icon--special {
+  background: linear-gradient(135deg, rgba(0, 183, 255, 0.3), rgba(255, 255, 255, 0.65));
+  border-color: rgba(0, 140, 200, 0.65);
+  color: #0b3c52;
+}
+
 :root[data-theme="dark"] .special-icon--mega {
   background: linear-gradient(135deg, rgba(67, 46, 120, 0.7), rgba(120, 70, 200, 0.35));
   border-color: rgba(200, 150, 255, 0.85);
@@ -1127,6 +1134,12 @@ body::after {
   background: linear-gradient(135deg, rgba(120, 30, 60, 0.7), rgba(255, 120, 160, 0.35));
   border-color: rgba(255, 150, 190, 0.85);
   color: #ffe1ea;
+}
+
+:root[data-theme="dark"] .special-icon--special {
+  background: linear-gradient(135deg, rgba(8, 73, 102, 0.8), rgba(0, 153, 204, 0.4));
+  border-color: rgba(133, 220, 255, 0.85);
+  color: #e3f8ff;
 }
 
 .empty-results {

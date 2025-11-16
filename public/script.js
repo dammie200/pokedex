@@ -20,7 +20,10 @@ const FLAG_ICONS = {
   alpha: "α",
 };
 const API_BASE_URL = "https://pokeapi.co/api/v2";
+const HOME_GAME_ID = "pokemon-home";
+const HOME_SPECIAL_FORMS_DEX_ID = `${HOME_GAME_ID}-special-forms`;
 const GENDER_DEX_ID = "home-gender";
+const ULTIMATE_DEX_ID = "home-ultimate";
 const GENDER_DIFFERENCE_CACHE_KEY = "gender-difference-species-v1";
 const VERSION_BADGE_STYLES = {
   scarlet: { label: "Scarlet", color: "#d2483c" },
@@ -68,7 +71,7 @@ const VERSION_BADGE_STYLES = {
   "black-2": { label: "Black 2", color: "#424242" },
   "white-2": { label: "White 2", color: "#ededed", textColor: "#1f1f1f" },
 };
-const GMAX_FLAG_GAMES = new Set(["sword-shield", "pokemon-home"]);
+const GMAX_FLAG_GAMES = new Set(["sword-shield", HOME_GAME_ID]);
 const MEGA_FLAG_GAMES = new Set([
   "x-y",
   "sun-moon",
@@ -76,7 +79,7 @@ const MEGA_FLAG_GAMES = new Set([
   "omega-ruby-alpha-sapphire",
   "lets-go",
   "legends-za",
-  "pokemon-home",
+  HOME_GAME_ID,
 ]);
 const ALPHA_FLAG_GAMES = new Set(["legends-arceus", "legends-za"]);
 
@@ -172,9 +175,11 @@ const state = {
     search: "",
   },
   caughtByGame: {},
+  caughtVersionByGame: {},
+  normalizedCaughtCache: {},
   selectedDexByGame: {},
   gameNotesByGame: {},
-  variantsBySpecies: { mega: {}, gmax: {} },
+  variantsBySpecies: { mega: {}, gmax: {}, special: {} },
   variantDefinitionMap: new Map(),
   flagSets: {
     shiny: {},
@@ -217,7 +222,7 @@ function loadThemePreference() {
       state.theme = THEMES.DARK;
     }
   } catch (error) {
-    console.warn("Kon thema niet laden:", error);
+    console.warn("Could not load theme:", error);
   }
   applyTheme(state.theme);
 }
@@ -228,7 +233,7 @@ function toggleTheme() {
   try {
     localStorage.setItem(THEME_STORAGE_KEY, next);
   } catch (error) {
-    console.warn("Kon thema niet opslaan:", error);
+    console.warn("Could not save theme:", error);
   }
 }
 
@@ -244,8 +249,8 @@ function applyControlsCollapsed(collapsed) {
   }
   if (dom.controlsToggleText) {
     dom.controlsToggleText.textContent = isCollapsed
-      ? "Filters uitklappen"
-      : "Filters inklappen";
+      ? "Expand filters"
+      : "Collapse filters";
   }
   if (state.viewMode === VIEW_MODES.COMPACT) {
     scheduleCompactViewportMeasurement();
@@ -257,7 +262,7 @@ function loadControlsCollapsePreference() {
   try {
     collapsed = localStorage.getItem(CONTROLS_COLLAPSE_STORAGE_KEY) === "true";
   } catch (error) {
-    console.warn("Kon filtervoorkeur niet laden:", error);
+    console.warn("Could not load filter preference:", error);
   }
   applyControlsCollapsed(collapsed);
 }
@@ -268,7 +273,7 @@ function toggleControlsCollapsed() {
   try {
     localStorage.setItem(CONTROLS_COLLAPSE_STORAGE_KEY, next ? "true" : "false");
   } catch (error) {
-    console.warn("Kon filtervoorkeur niet opslaan:", error);
+    console.warn("Could not save filter preference:", error);
   }
 }
 
@@ -426,8 +431,9 @@ const VERSION_NAME_OVERRIDES = {
 };
 
 const SPECIAL_FORM_METADATA = {
-  mega: { symbol: "M", className: "special-icon--mega", label: "Mega evolutie" },
+  mega: { symbol: "M", className: "special-icon--mega", label: "Mega evolution" },
   gmax: { symbol: "G", className: "special-icon--gmax", label: "Gigantamax" },
+  special: { symbol: "S", className: "special-icon--special", label: "Special form" },
 };
 
 const VERSION_RELEASE_ORDER = [
@@ -598,7 +604,7 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       versionName: "Scarlet",
       locations: [
         { name: "South Province (Areas One–Six)", methods: ["Overworld"] },
-        { name: "West & North Province", methods: ["Habitat verkenning"] },
+        { name: "West & North Province", methods: ["Habitat exploration"] },
         { name: "Area Zero", methods: ["Late-game overworld"] },
         { name: "Tera Raid Dens", methods: ["Tera Raids"] },
       ],
@@ -619,8 +625,8 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       versionName: "Teal Mask",
       locations: [
         { name: "Kitakami Road & Mossfell Confluence", methods: ["Overworld"] },
-        { name: "Timeless Woods", methods: ["Nacht spawns & events"] },
-        { name: "Crystal Pool", methods: ["Speciale ontmoetingen"] },
+        { name: "Timeless Woods", methods: ["Night spawns & events"] },
+        { name: "Crystal Pool", methods: ["Special encounters"] },
       ],
     },
   ],
@@ -631,7 +637,7 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       locations: [
         { name: "Savanna & Coastal Biome", methods: ["Blueberry Biome overworld"] },
         { name: "Canyon & Polar Biome", methods: ["Blueberry Biome overworld"] },
-        { name: "BB Quests", methods: ["Blueberry Quests beloningen"] },
+        { name: "BB Quests", methods: ["Blueberry Quests rewards"] },
       ],
     },
   ],
@@ -640,16 +646,16 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       version: "scarlet",
       versionName: "Scarlet",
       locations: [
-        { name: "Tera Raid Dens", methods: ["5★-7★ evenementen"] },
-        { name: "Blueberry Academy", methods: ["BB Quests en legendarische excursies"] },
+        { name: "Tera Raid Dens", methods: ["5★-7★ events"] },
+        { name: "Blueberry Academy", methods: ["BB Quests & legendary excursions"] },
       ],
     },
     {
       version: "violet",
       versionName: "Violet",
       locations: [
-        { name: "Tera Raid Dens", methods: ["5★-7★ evenementen"] },
-        { name: "Blueberry Academy", methods: ["BB Quests en legendarische excursies"] },
+        { name: "Tera Raid Dens", methods: ["5★-7★ events"] },
+        { name: "Blueberry Academy", methods: ["BB Quests & legendary excursions"] },
       ],
     },
   ],
@@ -659,7 +665,7 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       versionName: "Sword",
       locations: [
         { name: "Wild Area", methods: ["Overworld", "Max Raid Battles"] },
-        { name: "Routes & Cities", methods: ["Grasvelden", "Fishing"] },
+        { name: "Routes & Cities", methods: ["Grass encounters", "Fishing"] },
       ],
     },
     {
@@ -667,7 +673,7 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       versionName: "Shield",
       locations: [
         { name: "Wild Area", methods: ["Overworld", "Max Raid Battles"] },
-        { name: "Routes & Cities", methods: ["Grasvelden", "Fishing"] },
+        { name: "Routes & Cities", methods: ["Grass encounters", "Fishing"] },
       ],
     },
   ],
@@ -677,7 +683,7 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       versionName: "Isle of Armor",
       locations: [
         { name: "Fields of Honor & Soothing Wetlands", methods: ["Overworld"] },
-        { name: "Courageous Cavern", methods: ["Grotten"] },
+        { name: "Courageous Cavern", methods: ["Caves"] },
         { name: "Max Raid Dens", methods: ["Dynamax Raids"] },
       ],
     },
@@ -689,7 +695,7 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       locations: [
         { name: "Slippery Slope & Giant's Bed", methods: ["Overworld"] },
         { name: "Max Lair", methods: ["Dynamax Adventures"] },
-        { name: "Crown Shrine", methods: ["Verhaal evenementen"] },
+        { name: "Crown Shrine", methods: ["Story events"] },
       ],
     },
   ],
@@ -705,14 +711,14 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       version: "sword",
       versionName: "Sword",
       locations: [
-        { name: "Mystery Gift", methods: ["Evenementen & transfers"] },
+        { name: "Mystery Gift", methods: ["Events & transfers"] },
       ],
     },
     {
       version: "shield",
       versionName: "Shield",
       locations: [
-        { name: "Mystery Gift", methods: ["Evenementen & transfers"] },
+        { name: "Mystery Gift", methods: ["Events & transfers"] },
       ],
     },
   ],
@@ -721,8 +727,8 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       version: "legends-arceus",
       versionName: "Legends Arceus",
       locations: [
-        { name: "Obsidian Fieldlands", methods: ["Verkenning & Mass Outbreaks"] },
-        { name: "Crimson Mirelands", methods: ["Ruimtijdverstoringen"] },
+        { name: "Obsidian Fieldlands", methods: ["Exploration & Mass Outbreaks"] },
+        { name: "Crimson Mirelands", methods: ["Space-time distortions"] },
         { name: "Coronet Highlands / Alabaster Icelands", methods: ["Postgame"] },
       ],
     },
@@ -778,7 +784,7 @@ function formatTypeLabel(type) {
 }
 
 function formatLocationName(name) {
-  if (!name) return "Onbekende locatie";
+  if (!name) return "Unknown location";
   return titleCase(String(name));
 }
 
@@ -824,7 +830,8 @@ const VARIANT_CATEGORY_ORDER = {
   regional: 0,
   mega: 1,
   gmax: 2,
-  gender: 3,
+  special: 3,
+  gender: 4,
 };
 
 function groupVariantDefinitionsBySpecies(definitions = []) {
@@ -845,7 +852,7 @@ function groupVariantDefinitionsBySpecies(definitions = []) {
       }
       const nameA = a?.name || "";
       const nameB = b?.name || "";
-      return nameA.localeCompare(nameB, "nl", { sensitivity: "base" });
+      return nameA.localeCompare(nameB, "en", { sensitivity: "base" });
     });
   });
   return map;
@@ -857,11 +864,79 @@ function getGames() {
     : [];
 }
 
+function ensureCaughtVersionEntry(gameId) {
+  if (!gameId) return;
+  if (!state.caughtVersionByGame) {
+    state.caughtVersionByGame = {};
+  }
+  if (typeof state.caughtVersionByGame[gameId] !== "number") {
+    state.caughtVersionByGame[gameId] = 0;
+  }
+}
+
+function bumpCaughtVersion(gameId) {
+  if (!gameId) return;
+  ensureCaughtVersionEntry(gameId);
+  state.caughtVersionByGame[gameId] += 1;
+  if (state.normalizedCaughtCache && state.normalizedCaughtCache[gameId]) {
+    delete state.normalizedCaughtCache[gameId];
+  }
+}
+
+function resetCaughtVersions() {
+  state.caughtVersionByGame = {};
+  state.normalizedCaughtCache = {};
+  Object.keys(state.caughtByGame || {}).forEach((gameId) => {
+    state.caughtVersionByGame[gameId] = 0;
+  });
+}
+
 function getCaughtSet(gameId) {
   if (!state.caughtByGame[gameId]) {
     state.caughtByGame[gameId] = new Set();
+    ensureCaughtVersionEntry(gameId);
+  } else {
+    ensureCaughtVersionEntry(gameId);
   }
   return state.caughtByGame[gameId];
+}
+
+function normalizeCatchKeyValue(key) {
+  if (key === undefined || key === null) return "";
+  const value = String(key);
+  const separatorIndex = value.indexOf("|");
+  return separatorIndex >= 0 ? value.slice(separatorIndex + 1) : value;
+}
+
+function getNormalizedCaughtSet(gameId) {
+  if (!gameId || !state.caughtByGame) return null;
+  const set = state.caughtByGame[gameId];
+  if (!(set instanceof Set)) return null;
+  const cacheEntry = state.normalizedCaughtCache?.[gameId];
+  const version = state.caughtVersionByGame?.[gameId] ?? 0;
+  if (cacheEntry && cacheEntry.version === version) {
+    return cacheEntry.set;
+  }
+  const normalized = new Set();
+  set.forEach((value) => normalized.add(normalizeCatchKeyValue(value)));
+  if (!state.normalizedCaughtCache) {
+    state.normalizedCaughtCache = {};
+  }
+  state.normalizedCaughtCache[gameId] = { version, set: normalized };
+  return normalized;
+}
+
+function doesGameContainCatchKey(gameId, catchKey) {
+  if (!gameId || !catchKey) return false;
+  const set = state.caughtByGame?.[gameId];
+  if (!(set instanceof Set)) return false;
+  const normalizedKey = String(catchKey);
+  if (set.has(normalizedKey)) {
+    return true;
+  }
+  const normalizedValue = normalizeCatchKeyValue(normalizedKey);
+  const normalizedSet = getNormalizedCaughtSet(gameId);
+  return normalizedSet ? normalizedSet.has(normalizedValue) : false;
 }
 
 function getCurrentGame() {
@@ -901,25 +976,53 @@ function setCurrentDex(dexId, shouldPersist = true) {
   }
 }
 
+function getHomeGame(source = state.pokedexData || window.POKEDEX_DATA) {
+  if (!source || !Array.isArray(source.games)) return null;
+  return source.games.find((game) => game.id === HOME_GAME_ID) || null;
+}
+
 function injectHomeGenderDex(data) {
   if (!data || !Array.isArray(data.games)) return;
-  const homeGame = data.games.find((game) => game.id === "pokemon-home");
+  const homeGame = data.games.find((game) => game.id === HOME_GAME_ID);
   if (!homeGame || !Array.isArray(homeGame.dexes)) return;
   if (homeGame.dexes.some((dex) => dex.id === GENDER_DEX_ID)) {
     return;
   }
   homeGame.dexes.push({
     id: GENDER_DEX_ID,
-    name: "Gender verschillen",
+    name: "Gender differences",
     entries: [],
     isGenderDex: true,
   });
 }
 
+function injectHomeUltimateDex(data) {
+  if (!data || !Array.isArray(data.games)) return;
+  const homeGame = data.games.find((game) => game.id === HOME_GAME_ID);
+  if (!homeGame || !Array.isArray(homeGame.dexes)) return;
+  if (homeGame.dexes.some((dex) => dex.id === ULTIMATE_DEX_ID)) {
+    return;
+  }
+  const availableDexIds = new Set(homeGame.dexes.map((dex) => dex.id));
+  const sourceDexIds = [
+    "home",
+    "home-alternate",
+    HOME_SPECIAL_FORMS_DEX_ID,
+    GENDER_DEX_ID,
+  ].filter((dexId) => availableDexIds.has(dexId) || dexId === GENDER_DEX_ID);
+
+  homeGame.dexes.push({
+    id: ULTIMATE_DEX_ID,
+    name: "Ultimate Pokédex",
+    entries: [],
+    sourceDexIds,
+    versions: [],
+  });
+}
+
 function getHomeNationalDex() {
   const data = state.pokedexData || window.POKEDEX_DATA;
-  if (!data || !Array.isArray(data.games)) return null;
-  const homeGame = data.games.find((game) => game.id === "pokemon-home");
+  const homeGame = getHomeGame(data);
   if (!homeGame || !Array.isArray(homeGame.dexes)) return null;
   return homeGame.dexes.find((dex) => dex.id === "home") || null;
 }
@@ -953,22 +1056,101 @@ function ensureGenderDexEntries(dex) {
     .catch((error) => {
       state.genderDex.error = error;
       state.genderDex.isLoading = false;
-      console.error("Kon gender dex niet laden:", error);
+      console.error("Could not load the gender dex:", error);
       renderDex();
     });
   return "loading";
 }
 
+function cloneUltimateEntry(entry, overrides = {}) {
+  if (!entry) return null;
+  return { ...entry, ...overrides };
+}
+
+function annotateGenderedUltimateEntry(entry, gender) {
+  if (!entry || (gender !== "male" && gender !== "female")) {
+    return entry;
+  }
+  const label = gender === "female" ? "Female" : "Male";
+  const baseName = entry.name || "";
+  const suffix = ` (${label})`;
+  const annotatedName = baseName.endsWith(suffix)
+    ? baseName
+    : `${baseName}${baseName ? " " : ""}(${label})`;
+  return cloneUltimateEntry(entry, {
+    name: annotatedName,
+    genderSpritePreference: gender,
+  });
+}
+
+function ensureUltimateDexEntries(dex) {
+  if (!dex || dex.id !== ULTIMATE_DEX_ID) {
+    return "ready";
+  }
+  const homeGame = getHomeGame();
+  if (!homeGame || !Array.isArray(homeGame.dexes)) {
+    dex.entries = [];
+    return "ready";
+  }
+  const sourceDexIds = Array.isArray(dex.sourceDexIds) ? dex.sourceDexIds : [];
+  if (!sourceDexIds.length) {
+    dex.entries = [];
+    return "ready";
+  }
+  const seenKeys = new Set();
+  const aggregated = [];
+  const genderSpeciesSet = state.genderDex?.speciesSet;
+
+  for (const sourceId of sourceDexIds) {
+    if (!sourceId) continue;
+    const sourceDex = homeGame.dexes.find((entryDex) => entryDex.id === sourceId);
+    if (!sourceDex) continue;
+    if (sourceId === GENDER_DEX_ID) {
+      const status = ensureGenderDexEntries(sourceDex);
+      if (status === "loading") {
+        return "loading";
+      }
+      if (state.genderDex?.error) {
+        continue;
+      }
+    }
+    const entries = Array.isArray(sourceDex.entries) ? sourceDex.entries : [];
+    entries.forEach((entry) => {
+      if (!entry) return;
+      let adapted = entry;
+      if (sourceId === GENDER_DEX_ID) {
+        adapted = annotateGenderedUltimateEntry(entry, "female") || entry;
+      } else if (
+        sourceId === "home" &&
+        genderSpeciesSet?.has?.(String(entry.speciesId))
+      ) {
+        adapted = annotateGenderedUltimateEntry(entry, "male") || entry;
+      } else {
+        adapted = cloneUltimateEntry(entry) || entry;
+      }
+
+      const key =
+        adapted.aggregateKey || adapted.key || `${adapted.speciesId}:${adapted.form ?? ""}`;
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+      aggregated.push(adapted);
+    });
+  }
+
+  dex.entries = aggregated;
+  return "ready";
+}
+
 function getGenderDexProgressMessage() {
   const progress = state.genderDex?.progress || { processed: 0, total: 0 };
   if (!progress.total) {
-    return "Gender dex wordt samengesteld…";
+    return "Building gender dex…";
   }
   const percentage = Math.min(
     100,
     Math.round((progress.processed / progress.total) * 100)
   );
-  return `Gender dex wordt samengesteld… (${progress.processed}/${progress.total}, ${percentage}%)`;
+  return `Building gender dex… (${progress.processed}/${progress.total}, ${percentage}%)`;
 }
 
 function renderGenderDexLoading() {
@@ -989,7 +1171,23 @@ function renderGenderDexLoading() {
 
 function renderGenderDexError() {
   if (dom.dexGrid) {
-    dom.dexGrid.innerHTML = `<p class="loading-message">Kon gender dex niet laden. Probeer het opnieuw.</p>`;
+    dom.dexGrid.innerHTML = `<p class="loading-message">Could not load the gender dex. Please try again.</p>`;
+  }
+  if (dom.dexListBody) {
+    dom.dexListBody.innerHTML = "";
+  }
+  state.totalBoxes = 1;
+  updateBoxIndicator(0, 1);
+  updateSpecialFilterControl({ mega: false, gmax: false });
+  updateSpriteModeActions({ mega: false, gmax: false });
+  updateDexProgress([], new Set());
+  updateViewToggleButtons();
+  updateBoxControls();
+}
+
+function renderUltimateDexLoading() {
+  if (dom.dexGrid) {
+    dom.dexGrid.innerHTML = '<p class="loading-message">Building the Ultimate Pokédex…</p>';
   }
   if (dom.dexListBody) {
     dom.dexListBody.innerHTML = "";
@@ -1063,7 +1261,16 @@ async function buildGenderDexEntries(onProgress) {
   const filtered = baseEntries.filter((entry) =>
     speciesSet.has(String(entry.speciesId))
   );
-  return filtered.map((entry, index) => ({ ...entry, sortIndex: index + 1 }));
+  return filtered.map((entry, index) => {
+    const baseKey = getEntryCatchKey(entry);
+    const genderKey = baseKey ? `${baseKey}|gender` : null;
+    return {
+      ...entry,
+      key: genderKey || entry.key,
+      aggregateKey: genderKey || entry.key || entry.aggregateKey || baseKey || null,
+      sortIndex: index + 1,
+    };
+  });
 }
 
 async function getGenderDifferenceSpeciesSet(onProgress) {
@@ -1088,7 +1295,7 @@ function readGenderDifferenceCache() {
     if (!Array.isArray(parsed)) return null;
     return new Set(parsed.map((id) => String(id)));
   } catch (error) {
-    console.warn("Kon gender cache niet lezen:", error);
+    console.warn("Could not read gender cache:", error);
     return null;
   }
 }
@@ -1097,7 +1304,7 @@ function writeGenderDifferenceCache(ids = []) {
   try {
     localStorage.setItem(GENDER_DIFFERENCE_CACHE_KEY, JSON.stringify(ids));
   } catch (error) {
-    console.warn("Kon gender cache niet opslaan:", error);
+    console.warn("Could not store gender cache:", error);
   }
 }
 
@@ -1144,7 +1351,7 @@ async function fetchSpeciesGenderDifferenceFlag(speciesId) {
     const data = await response.json();
     return Boolean(data?.has_gender_differences);
   } catch (error) {
-    console.warn(`Kon genderinformatie voor soort ${speciesId} niet laden:`, error);
+    console.warn(`Could not load gender info for species :`, error);
     return false;
   }
 }
@@ -1209,7 +1416,7 @@ function computeSpecialAvailability(entries = []) {
 function resolveActiveSpecialFilter(availability) {
   const hasMega = Boolean(availability?.mega);
   const hasGmax = Boolean(availability?.gmax);
-  const supportsFilter = state.currentGameId === "pokemon-home" && (hasMega || hasGmax);
+  const supportsFilter = state.currentGameId === HOME_GAME_ID && (hasMega || hasGmax);
   let filter = state.specialFilter;
   if (!supportsFilter) {
     filter = "all";
@@ -1258,7 +1465,7 @@ function sortEntries(entries) {
     if (aValue === bValue) {
       return (a.displayNumber || "").localeCompare(
         b.displayNumber || "",
-        "nl",
+        "en",
         { numeric: true, sensitivity: "base" }
       );
     }
@@ -1310,7 +1517,7 @@ function ensurePokemonDetails(entry) {
     })
     .catch((error) => {
       pendingDetailRequests.delete(key);
-      console.warn("Kon Pokémondetails niet laden:", error);
+      console.warn("Could not load Pokémon details:", error);
       return null;
     });
 
@@ -1455,7 +1662,11 @@ function getSpriteForEntry(entry, details, options = {}) {
   const spriteMode = options.spriteMode || state.spriteMode;
   const catchKey = options.catchKey || getEntryCatchKey(entry);
   const gameId = options.gameId || state.currentGameId;
+  const entryGenderPreference = entry?.genderSpritePreference;
   const genderPreference = (() => {
+    if (entryGenderPreference === "male" || entryGenderPreference === "female") {
+      return entryGenderPreference;
+    }
     if (options.genderMode === "male" || options.genderMode === "female") {
       return options.genderMode;
     }
@@ -1518,6 +1729,8 @@ function getSpecialFormsForSpecies(speciesId) {
   mega.forEach((variant) => results.push({ type: "mega", variant }));
   const gmax = state.variantsBySpecies?.gmax?.[id] || [];
   gmax.forEach((variant) => results.push({ type: "gmax", variant }));
+  const special = state.variantsBySpecies?.special?.[id] || [];
+  special.forEach((variant) => results.push({ type: "special", variant }));
   return results;
 }
 
@@ -1543,7 +1756,7 @@ function getVariantSprite(variant) {
     try {
       return window.POKEDEX_DATA.sprites.default(pokemonId);
     } catch (error) {
-      console.warn("Kon variant-sprite niet laden:", pokemonId, error);
+      console.warn("Could not load variant sprite:", pokemonId, error);
     }
   }
   return "";
@@ -1664,13 +1877,14 @@ function buildVariantEntry(baseEntry, variant, type) {
 }
 
 function createSpecialFormButton(baseEntry, variant, type) {
-  const meta = SPECIAL_FORM_METADATA[type] || SPECIAL_FORM_METADATA.mega;
+  const meta = SPECIAL_FORM_METADATA[type] || SPECIAL_FORM_METADATA.special;
   const button = document.createElement("button");
   button.type = "button";
   button.className = `special-icon ${meta.className}`;
   button.textContent = meta.symbol;
   const variantName = variant.name || baseEntry.name;
   button.title = `${meta.label}: ${variantName}`;
+  button.setAttribute("aria-label", button.title);
   button.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -1679,10 +1893,13 @@ function createSpecialFormButton(baseEntry, variant, type) {
   return button;
 }
 
-function appendSpecialForms(container, entry) {
+function appendSpecialForms(container, entry, options = {}) {
+  const { includeSpecial = true } = options;
   if (!container || !entry) return;
   container.innerHTML = "";
-  const forms = getSpecialFormsForSpecies(entry.speciesId);
+  const forms = getSpecialFormsForSpecies(entry.speciesId).filter(
+    (form) => includeSpecial || form.type !== "special"
+  );
   if (!forms.length) {
     container.hidden = true;
     return;
@@ -1703,19 +1920,64 @@ function openVariantDetailsForEntry(baseEntry, variant, type) {
   }
 }
 
+function isSpecialVariantEntry(entry) {
+  if (!entry || !entry.form) return false;
+  const definition = findVariantDefinition(entry.speciesId, entry.form);
+  return definition?.category === "special";
+}
+
+function findBaseEntryForSpecies(speciesId) {
+  const game = getCurrentGame();
+  if (!game || !Array.isArray(game.dexes)) return null;
+  for (const dex of game.dexes) {
+    const entries = Array.isArray(dex.entries) ? dex.entries : [];
+    const candidate = entries.find(
+      (entry) => entry.speciesId === speciesId && !isSpecialVariantEntry(entry)
+    );
+    if (candidate) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function buildDetailsEntry(entry) {
+  if (!entry) return null;
+  if (!isSpecialVariantEntry(entry)) {
+    return entry;
+  }
+  const baseEntry = findBaseEntryForSpecies(entry.speciesId);
+  if (baseEntry) {
+    return { ...baseEntry };
+  }
+  if (entry.form) {
+    return { ...entry, form: null, key: String(entry.speciesId) };
+  }
+  return entry;
+}
+
+function openEntryDetails(entry) {
+  if (!entry) return;
+  const normalized = buildDetailsEntry(entry) || entry;
+  openPokemonDetails(normalized);
+}
+
 function isCaughtInOtherGames(catchKey, excludeGameId = state.currentGameId) {
   if (!catchKey) return false;
   const key = String(catchKey);
-  return Object.entries(state.caughtByGame).some(([gameId, set]) => {
+  return Object.keys(state.caughtByGame || {}).some((gameId) => {
     if (gameId === excludeGameId) return false;
-    if (!(set instanceof Set)) return false;
-    return set.has(key);
+    return doesGameContainCatchKey(gameId, key);
   });
 }
 
 function shouldHighlightHome(catchKey, gameId = state.currentGameId) {
-  if (gameId !== "pokemon-home") return false;
-  return isCaughtInOtherGames(catchKey, gameId);
+  if (!catchKey) return false;
+  const normalized = String(catchKey);
+  if (gameId === HOME_GAME_ID) {
+    return isCaughtInOtherGames(normalized, gameId);
+  }
+  return doesGameContainCatchKey(HOME_GAME_ID, normalized);
 }
 
 function syncFlagLabelState(label, input) {
@@ -1760,7 +2022,7 @@ function renderStatusCheckboxes(container, entry, catchKey) {
     input.checked = isFlagActive(flag, catchKey, gameId);
     input.setAttribute(
       "aria-label",
-      `${FLAG_LABELS[flag]} status voor ${entry?.name || "deze Pokémon"}`
+      `${FLAG_LABELS[flag]} status for ${entry?.name || "this Pokémon"}`
     );
     ["click", "pointerdown", "keydown"].forEach((type) => {
       input.addEventListener(type, (event) => {
@@ -1813,17 +2075,17 @@ function renderGrid(entries, caughtSet) {
 
     if (name) {
       name.textContent = entry.name;
-      name.setAttribute("aria-label", `Toon details voor ${entry.name}`);
+      name.setAttribute("aria-label", `View details for ${entry.name}`);
       name.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        openPokemonDetails(entry);
+        openEntryDetails(entry);
       });
       name.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           event.stopPropagation();
-          openPokemonDetails(entry);
+          openEntryDetails(entry);
         }
       });
     }
@@ -1845,7 +2107,7 @@ function renderGrid(entries, caughtSet) {
     card.classList.toggle("pokemon-card--compact", isCompact);
 
     renderTypeBadges(typesContainer, entry.types || cachedDetails?.types || []);
-    appendSpecialForms(special, entry);
+    appendSpecialForms(special, entry, { includeSpecial: false });
     renderVersionBadges(versionContainer, entry);
     const hasExclusive = Boolean(entry?.versionExclusive?.length);
     card.classList.toggle("pokemon-card--exclusive", hasExclusive);
@@ -1919,7 +2181,7 @@ function createListRow(entry, caughtSet) {
     nameButton.textContent = entry.name;
     nameButton.addEventListener("click", (event) => {
       event.preventDefault();
-      openPokemonDetails(entry);
+      openEntryDetails(entry);
     });
   }
 
@@ -1927,7 +2189,7 @@ function createListRow(entry, caughtSet) {
   renderTypeBadges(typesCell, entry.types || getCachedPokemonDetails(entry)?.types || []);
 
   const specialContainer = node.querySelector(".pokemon-special");
-  appendSpecialForms(specialContainer, entry);
+  appendSpecialForms(specialContainer, entry, { includeSpecial: false });
   const versionContainer = node.querySelector("[data-version-badges]");
   renderVersionBadges(versionContainer, entry);
 
@@ -1943,8 +2205,8 @@ function createListRow(entry, caughtSet) {
   node.dataset.caught = String(isCaught);
   if (statusButton) {
     statusButton.textContent = isCaught
-      ? "Verwijder markering"
-      : "Markeer als gevangen";
+      ? "Clear mark"
+      : "Mark as caught";
   }
   node.dataset.homeOwned = String(shouldHighlightHome(catchKey, state.currentGameId));
 
@@ -1987,8 +2249,8 @@ function updateListRow(catchKey) {
   const button = row.querySelector(".status-toggle");
   if (button) {
     button.textContent = isCaught
-      ? "Verwijder markering"
-      : "Markeer als gevangen";
+      ? "Clear mark"
+      : "Mark as caught";
   }
 }
 
@@ -2072,10 +2334,16 @@ function toggleCaught(catchKey) {
   if (!state.currentGameId || !catchKey) return;
   const caughtSet = getCaughtSet(state.currentGameId);
   const normalized = String(catchKey);
+  let changed = false;
   if (caughtSet.has(normalized)) {
     caughtSet.delete(normalized);
+    changed = true;
   } else {
     caughtSet.add(normalized);
+    changed = true;
+  }
+  if (changed) {
+    bumpCaughtVersion(state.currentGameId);
   }
   persistState();
   if (state.caughtFilter === "all") {
@@ -2088,15 +2356,25 @@ function toggleCaught(catchKey) {
 function markEntries(entries, shouldMark) {
   if (!state.currentGameId) return;
   const caughtSet = getCaughtSet(state.currentGameId);
+  let changed = false;
   entries.forEach((entry) => {
     const key = getEntryCatchKey(entry);
     if (!key) return;
     if (shouldMark) {
-      caughtSet.add(String(key));
+      const normalized = String(key);
+      if (!caughtSet.has(normalized)) {
+        caughtSet.add(normalized);
+        changed = true;
+      }
     } else {
-      caughtSet.delete(String(key));
+      if (caughtSet.delete(String(key))) {
+        changed = true;
+      }
     }
   });
+  if (changed) {
+    bumpCaughtVersion(state.currentGameId);
+  }
   persistState();
   renderDex();
 }
@@ -2200,7 +2478,7 @@ function resolveSpriteMode(baseAvailability) {
 function updateSpecialFilterControl(baseAvailability) {
   const hasMega = Boolean(baseAvailability?.mega);
   const hasGmax = Boolean(baseAvailability?.gmax);
-  const shouldShow = state.currentGameId === "pokemon-home" && (hasMega || hasGmax);
+  const shouldShow = state.currentGameId === HOME_GAME_ID && (hasMega || hasGmax);
   if (dom.specialFilterControl) {
     dom.specialFilterControl.hidden = !shouldShow;
   }
@@ -2398,7 +2676,7 @@ function getSpeciesSprite(speciesId) {
   try {
     return window.POKEDEX_DATA.sprites.default(speciesId) || "";
   } catch (error) {
-    console.warn("Kon sprite niet ophalen voor", speciesId, error);
+    console.warn("Could not fetch sprite for", speciesId, error);
     return "";
   }
 }
@@ -2415,7 +2693,7 @@ function createEvolutionMonNode(data) {
     const img = document.createElement("img");
     img.className = "pokemon-details__evolution-sprite";
     img.src = spriteUrl;
-    img.alt = `${data?.name || "Onbekend"} sprite`;
+    img.alt = `${data?.name || "Unknown"} sprite`;
     img.loading = "lazy";
     wrapper.append(img);
   } else {
@@ -2426,7 +2704,7 @@ function createEvolutionMonNode(data) {
 
   const label = document.createElement("span");
   label.className = "pokemon-details__evolution-name";
-  label.textContent = data?.name || "Onbekend";
+  label.textContent = data?.name || "Unknown";
   wrapper.append(label);
 
   return wrapper;
@@ -2443,7 +2721,7 @@ function renderEvolution(container, evolution = {}, entry) {
   if (!steps.length && !relevantSpecialForms.length) {
     const empty = document.createElement("p");
     empty.className = "pokemon-details__empty";
-    empty.textContent = "Geen evolutiegegevens beschikbaar.";
+    empty.textContent = "No evolution data available.";
     container.append(empty);
     return;
   }
@@ -2516,7 +2794,7 @@ function renderSpecialEvolutionForms(container, entry, forms) {
     path.append(fromNode, arrow, toNode);
     block.append(path);
 
-    const meta = SPECIAL_FORM_METADATA[type] || { label: "Speciale vorm" };
+    const meta = SPECIAL_FORM_METADATA[type] || SPECIAL_FORM_METADATA.special;
     const list = document.createElement("ul");
     list.className = "pokemon-details__evolution-methods";
     const item = document.createElement("li");
@@ -2555,7 +2833,7 @@ function buildGenderVariantEntries(entry, details) {
       key: `${entry.speciesId}:gender-male`,
       speciesId: entry.speciesId,
       form: entry.form || null,
-      name: `${entry.name} (mannetje)`,
+      name: `${entry.name} (Male)`,
       sprite: maleSprite,
       category: "gender",
     });
@@ -2564,7 +2842,7 @@ function buildGenderVariantEntries(entry, details) {
     key: `${entry.speciesId}:gender-female`,
     speciesId: entry.speciesId,
     form: entry.form || null,
-    name: `${entry.name} (vrouwtje)`,
+    name: `${entry.name} (Female)`,
     sprite: femaleSprite,
     category: "gender",
   });
@@ -2577,7 +2855,7 @@ function renderVariants(container, entry, details = null) {
   if (!entry) {
     const empty = document.createElement("p");
     empty.className = "pokemon-details__empty";
-    empty.textContent = "Geen varianten beschikbaar.";
+    empty.textContent = "No variants available.";
     container.append(empty);
     return;
   }
@@ -2587,7 +2865,7 @@ function renderVariants(container, entry, details = null) {
   if (!combined.length) {
     const empty = document.createElement("p");
     empty.className = "pokemon-details__empty";
-    empty.textContent = "Geen varianten beschikbaar.";
+    empty.textContent = "No variants available.";
     container.append(empty);
     return;
   }
@@ -2604,7 +2882,7 @@ function renderVariants(container, entry, details = null) {
     if (entry.form && variantEntry.form && entry.form === variantEntry.form) {
       button.classList.add("is-current");
     }
-    button.title = `Bekijk details voor ${variantEntry.name}`;
+    button.title = `View details for ${variantEntry.name}`;
     button.addEventListener("click", () => {
       openPokemonDetails(variantEntry);
     });
@@ -2677,8 +2955,8 @@ function showPokemonDetailsLoading(entry) {
     dom.detailSprite.alt = `${entry.name} sprite`;
   }
 
-  if (dom.detailHeight) dom.detailHeight.textContent = "Laden…";
-  if (dom.detailWeight) dom.detailWeight.textContent = "Laden…";
+  if (dom.detailHeight) dom.detailHeight.textContent = "Loading…";
+  if (dom.detailWeight) dom.detailWeight.textContent = "Loading…";
 
   if (dom.detailLinks) {
     dom.detailLinks.innerHTML = "";
@@ -2699,11 +2977,11 @@ function showPokemonDetailsLoading(entry) {
     dom.detailVersions.hidden = true;
   }
 
-  if (dom.detailEvolution) {
-    dom.detailEvolution.innerHTML = "";
+  if (dom.detailVariants) {
+    dom.detailVariants.innerHTML = "";
     const loading = document.createElement("p");
     loading.className = "pokemon-details__empty";
-    loading.textContent = "Gegevens worden geladen…";
+    loading.textContent = "Loading data…";
     dom.detailEvolution.append(loading);
   }
 
@@ -2711,7 +2989,7 @@ function showPokemonDetailsLoading(entry) {
     dom.detailVariants.innerHTML = "";
     const loading = document.createElement("p");
     loading.className = "pokemon-details__empty";
-    loading.textContent = "Gegevens worden geladen…";
+    loading.textContent = "Loading data…";
     dom.detailVariants.append(loading);
   }
 }
@@ -2783,12 +3061,12 @@ async function openPokemonDetails(entry) {
   try {
     const details = await ensurePokemonDetails(entry);
     if (!details) {
-      showPokemonDetailsError("Kon details niet laden.");
+      showPokemonDetailsError("Unable to load details.");
       return;
     }
     applyPokemonDetails(entry, details);
   } catch (error) {
-    showPokemonDetailsError("Kon details niet laden.");
+    showPokemonDetailsError("Unable to load details.");
   }
 }
 
@@ -2818,7 +3096,7 @@ function setupDetailsDialog() {
 function formatHeight(decimeters) {
   if (!Number.isFinite(decimeters)) return "-";
   const meters = decimeters / 10;
-  return `${meters.toLocaleString("nl-NL", {
+  return `${meters.toLocaleString("en-US", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   })} m`;
@@ -2827,7 +3105,7 @@ function formatHeight(decimeters) {
 function formatWeight(hectograms) {
   if (!Number.isFinite(hectograms)) return "-";
   const kilograms = hectograms / 10;
-  return `${kilograms.toLocaleString("nl-NL", {
+  return `${kilograms.toLocaleString("en-US", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   })} kg`;
@@ -2869,7 +3147,7 @@ function persistGameNotes() {
     }
     localStorage.setItem(GAME_NOTES_STORAGE_KEY, JSON.stringify(notes));
   } catch (error) {
-    console.warn("Kon spelnotities niet opslaan:", error);
+    console.warn("Could not save game notes:", error);
   }
 }
 
@@ -2949,8 +3227,8 @@ function exportTrackerData() {
     const timestamp = new Date().toISOString().replace(/[:T]/g, "-").split(".")[0];
     triggerDownload(`living-dex-export-${timestamp}.json`, JSON.stringify(payload, null, 2));
   } catch (error) {
-    console.error("Kon data niet exporteren:", error);
-    alert("Exporteren is mislukt. Probeer het opnieuw.");
+    console.error("Could not export data:", error);
+    alert("Export failed. Please try again.");
   }
 }
 
@@ -2968,6 +3246,7 @@ function applyImportedPayload(payload) {
       normalizeStoredIds(ids),
     ])
   );
+  resetCaughtVersions();
 
   const nextFlagSets = {};
   FLAG_KEYS.forEach((flag) => {
@@ -3004,7 +3283,7 @@ function applyImportedPayload(payload) {
     try {
       localStorage.setItem(THEME_STORAGE_KEY, importedTheme);
     } catch (error) {
-      console.warn("Kon thema niet opslaan:", error);
+      console.warn("Could not save theme:", error);
     }
   }
 
@@ -3016,7 +3295,7 @@ function applyImportedPayload(payload) {
         data.controlsCollapsed ? "true" : "false"
       );
     } catch (error) {
-      console.warn("Kon filtervoorkeur niet opslaan:", error);
+      console.warn("Could not save filter preference:", error);
     }
   }
 
@@ -3035,7 +3314,7 @@ function applyImportedPayload(payload) {
       try {
         localStorage.setItem(`${STORAGE_KEY}:current-game`, importedGameId);
       } catch (error) {
-        console.warn("Kon huidig spel niet opslaan:", error);
+        console.warn("Could not save current game:", error);
       }
       populateDexSelect();
     }
@@ -3058,17 +3337,17 @@ function handleImportFile(file) {
   if (!file) return;
   const reader = new FileReader();
   reader.addEventListener("error", () => {
-    console.error("Kon bestand niet lezen:", reader.error);
-    alert("Importeren is mislukt. Controleer het bestand en probeer opnieuw.");
+    console.error("Could not read file:", reader.error);
+    alert("Import failed. Check the file and try again.");
   });
   reader.addEventListener("load", () => {
     try {
       const parsed = JSON.parse(reader.result);
       applyImportedPayload(parsed);
-      alert("Data succesvol geïmporteerd!");
+      alert("Data imported successfully!");
     } catch (error) {
-      console.error("Kon data niet importeren:", error);
-      alert("Importeren is mislukt. Controleer het bestand en probeer opnieuw.");
+      console.error("Could not import data:", error);
+      alert("Import failed. Check the file and try again.");
     }
   });
   reader.readAsText(file);
@@ -3193,7 +3472,7 @@ function loadLegacyState() {
         ])
       );
     } catch (error) {
-      console.warn("Kon legacy voortgang niet laden:", error);
+      console.warn("Could not load legacy progress:", error);
     }
   }
   return null;
@@ -3220,6 +3499,7 @@ function loadState() {
         state.caughtByGame = legacy;
       }
     }
+    resetCaughtVersions();
 
     const storedDexSelection = localStorage.getItem(DEX_SELECTION_STORAGE_KEY);
     if (storedDexSelection) {
@@ -3231,7 +3511,45 @@ function loadState() {
           );
         }
       } catch (error) {
-        console.warn("Kon dex selectie niet laden:", error);
+        console.warn("Could not load dex selection:", error);
+      }
+    }
+
+    const storedFlags = localStorage.getItem(FLAG_STORAGE_KEY);
+    if (storedFlags) {
+      try {
+        const parsedFlags = JSON.parse(storedFlags);
+        if (parsedFlags && typeof parsedFlags === "object") {
+          FLAG_KEYS.forEach((flag) => {
+            const perGame = parsedFlags[flag];
+            if (perGame && typeof perGame === "object") {
+              state.flagSets[flag] = Object.fromEntries(
+                Object.entries(perGame).map(([gameId, ids]) => [
+                  gameId,
+                  normalizeStoredIds(ids),
+                ])
+              );
+            }
+          });
+        }
+      } catch (error) {
+        console.warn("Could not load flag state:", error);
+      }
+    }
+
+    const storedNotes = localStorage.getItem(GAME_NOTES_STORAGE_KEY);
+    if (storedNotes) {
+      try {
+        const parsedNotes = JSON.parse(storedNotes);
+        if (parsedNotes && typeof parsedNotes === "object") {
+          state.gameNotesByGame = Object.fromEntries(
+            Object.entries(parsedNotes)
+              .map(([gameId, note]) => [gameId, typeof note === "string" ? note : ""])
+              .filter(([, note]) => note.length)
+          );
+        }
+      } catch (error) {
+        console.warn("Could not load game notes:", error);
       }
     }
 
@@ -3273,7 +3591,7 @@ function loadState() {
       }
     }
   } catch (error) {
-    console.warn("Kon lokale data niet laden:", error);
+    console.warn("Could not load local data:", error);
   }
 }
 
@@ -3285,11 +3603,11 @@ function persistState() {
       try {
         localStorage.removeItem(key);
       } catch (error) {
-        console.warn("Kon legacy opslag niet verwijderen:", error);
+        console.warn("Could not clear legacy storage:", error);
       }
     });
   } catch (error) {
-    console.warn("Kon voortgang niet opslaan:", error);
+    console.warn("Could not save progress:", error);
   }
 }
 
@@ -3300,7 +3618,7 @@ function persistDexSelection() {
       JSON.stringify(getSerializableDexSelection())
     );
   } catch (error) {
-    console.warn("Kon dex selectie niet opslaan:", error);
+    console.warn("Could not save dex selection:", error);
   }
 }
 
@@ -3394,7 +3712,7 @@ function updateDexProgress(entries = [], caughtSet = new Set()) {
       dom.dexProgressBar.classList.remove("is-complete");
     }
     if (dom.dexProgressText) {
-      dom.dexProgressText.textContent = "0 / 0 gevangen";
+      dom.dexProgressText.textContent = "0 / 0 caught";
     }
     return;
   }
@@ -3411,7 +3729,7 @@ function updateDexProgress(entries = [], caughtSet = new Set()) {
   dom.dexProgress.hidden = false;
   const percentage = total ? Math.round((caught / total) * 100) : 0;
   if (dom.dexProgressText) {
-    dom.dexProgressText.textContent = `${caught} / ${total} gevangen (${percentage}%)`;
+    dom.dexProgressText.textContent = `${caught} / ${total} caught (${percentage}%)`;
   }
   if (dom.dexProgressBar) {
     dom.dexProgressBar.max = total;
@@ -3424,7 +3742,7 @@ function updateDexProgress(entries = [], caughtSet = new Set()) {
 function renderDex() {
   const currentGame = getCurrentGame();
   if (!currentGame) {
-    if (dom.dexGrid) dom.dexGrid.innerHTML = "<p>Geen spel geselecteerd.</p>";
+    if (dom.dexGrid) dom.dexGrid.innerHTML = "<p>No game selected.</p>";
     if (dom.dexListBody) dom.dexListBody.innerHTML = "";
     state.totalBoxes = 1;
     updateBoxIndicator(0, 1);
@@ -3439,7 +3757,7 @@ function renderDex() {
 
   const currentDex = getCurrentDex();
   if (!currentDex) {
-    if (dom.dexGrid) dom.dexGrid.innerHTML = "<p>Geen Pokédex beschikbaar.</p>";
+    if (dom.dexGrid) dom.dexGrid.innerHTML = "<p>No Pokédex available.</p>";
     if (dom.dexListBody) dom.dexListBody.innerHTML = "";
     if (dom.emptyDialog?.open) dom.emptyDialog.close();
     state.totalBoxes = 1;
@@ -3463,6 +3781,14 @@ function renderDex() {
     }
     if (state.genderDex?.error) {
       renderGenderDexError();
+      return;
+    }
+  }
+
+  if (currentDex.id === ULTIMATE_DEX_ID) {
+    const status = ensureUltimateDexEntries(currentDex);
+    if (status === "loading") {
+      renderUltimateDexLoading();
       return;
     }
   }
@@ -3595,7 +3921,7 @@ function setupDialog() {
 
 async function init() {
   if (dom.dexGrid) {
-    dom.dexGrid.innerHTML = '<p class="loading-message">Pokédexgegevens laden…</p>';
+    dom.dexGrid.innerHTML = '<p class="loading-message">Loading Pokédex data…</p>';
   }
 
   let data;
@@ -3604,25 +3930,27 @@ async function init() {
     if (!data || !Array.isArray(data.games) || !data.games.length) {
       if (dom.dexGrid) {
         dom.dexGrid.innerHTML =
-          "<p>Geen Pokédex data beschikbaar. Controleer je internetverbinding.</p>";
+          "<p>No Pokédex data available. Check your internet connection.</p>";
       }
       return;
     }
   } catch (error) {
-    console.error("Kon Pokédex data niet laden:", error);
+    console.error("Could not load Pokédex data:", error);
     if (dom.dexGrid) {
       dom.dexGrid.innerHTML =
-        "<p>Kon Pokédex data niet laden. Controleer je internetverbinding en probeer opnieuw.</p>";
+        "<p>Could not load Pokédex data. Check your internet connection and try again.</p>";
     }
     return;
   }
 
   injectHomeGenderDex(data);
+  injectHomeUltimateDex(data);
   state.pokedexData = data;
 
   state.variantsBySpecies = {
     mega: data?.variants?.mega || {},
     gmax: data?.variants?.gmax || {},
+    special: data?.variants?.special || {},
   };
   state.variantDefinitionMap = buildVariantDefinitionMap(data?.variants?.all || []);
   state.variantGroupsBySpecies = groupVariantDefinitionsBySpecies(data?.variants?.all || []);
