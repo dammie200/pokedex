@@ -971,6 +971,7 @@ const GAME_CONFIG = [
           type: "pokedex",
           slugs: ["lumiose-city"],
           excludeSpecies: [150, 716, 717, 718, 719],
+          catchKeyPrefix: "lumiose-alpha",
         },
       },
       {
@@ -1214,6 +1215,7 @@ const GAME_CONFIG = [
             645,
             905,
           ],
+          catchKeyPrefix: "hisui-alpha",
         },
       },
     ],
@@ -2566,6 +2568,7 @@ function buildDexEntry(options, speciesById) {
     sortIndex,
     pokemonId,
     pokemonSlug,
+    aggregateKeyOverride,
   } = options;
 
   const species = speciesById.get(speciesId);
@@ -2591,9 +2594,11 @@ function buildDexEntry(options, speciesById) {
     catchKeyOverride ||
     variant?.key ||
     (form ? `${speciesId}:${form}` : String(speciesId));
+  const aggregateKey = aggregateKeyOverride || key;
 
   return {
     key,
+    aggregateKey,
     speciesId,
     dexNumber: dexNumberValue,
     form,
@@ -2757,6 +2762,8 @@ function createEntryDefinition(speciesId, override = {}, fallbackDexNumber = nul
     resolved.regionCodeOverride ?? resolved.regionCode ?? null;
   const catchKeyOverride =
     resolved.catchKeyOverride ?? resolved.catchKey ?? null;
+  const aggregateKeyOverride =
+    resolved.aggregateKeyOverride ?? resolved.aggregateKey ?? null;
   const pokemonId = resolved.pokemonId ?? null;
   const pokemonSlug = resolved.pokemonSlug ?? null;
   const sortIndex =
@@ -2775,6 +2782,7 @@ function createEntryDefinition(speciesId, override = {}, fallbackDexNumber = nul
     spriteSlugOverride,
     regionCodeOverride,
     catchKeyOverride,
+    aggregateKeyOverride,
     sortIndex,
     pokemonId,
     pokemonSlug,
@@ -2886,6 +2894,21 @@ async function createDexEntries(source, speciesById, allSpecies, context = {}) {
       results = results.filter((entry) => !excludeSet.has(Number(entry.speciesId)));
     }
 
+    if (source.catchKeyPrefix) {
+      const prefix = String(source.catchKeyPrefix);
+      results = results
+        .map((entry) => {
+          if (!entry || !entry.key) return entry;
+          const baseKey = entry.aggregateKey || entry.key;
+          return {
+            ...entry,
+            key: `${prefix}|${baseKey}`,
+            aggregateKey: baseKey,
+          };
+        })
+        .filter(Boolean);
+    }
+
     return sortDexEntries(results);
   }
 
@@ -2901,7 +2924,8 @@ async function createDexEntries(source, speciesById, allSpecies, context = {}) {
       const entries = existingDexEntries.get(dexId) || [];
       entries.forEach((entry, entryIndex) => {
         if (!entry) return;
-        const key = entry.key || `${entry.speciesId}:${entry.form ?? ""}`;
+        const key =
+          entry.aggregateKey || entry.key || `${entry.speciesId}:${entry.form ?? ""}`;
         if (seenKeys.has(key)) return;
         seenKeys.add(key);
         aggregated.push({ entry, dexOrder, entryIndex });
@@ -2923,6 +2947,7 @@ async function createDexEntries(source, speciesById, allSpecies, context = {}) {
             spriteOverride: entry.sprite,
             regionCodeOverride: entry.regionCode,
             catchKeyOverride: entry.key,
+            aggregateKeyOverride: entry.aggregateKey || entry.key,
             pokemonId: entry.pokemonId,
             pokemonSlug: entry.pokemonSlug,
             dexNumber: index + 1,

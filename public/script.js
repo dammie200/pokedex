@@ -175,6 +175,8 @@ const state = {
     search: "",
   },
   caughtByGame: {},
+  caughtVersionByGame: {},
+  normalizedCaughtCache: {},
   selectedDexByGame: {},
   gameNotesByGame: {},
   variantsBySpecies: { mega: {}, gmax: {}, special: {} },
@@ -862,11 +864,79 @@ function getGames() {
     : [];
 }
 
+function ensureCaughtVersionEntry(gameId) {
+  if (!gameId) return;
+  if (!state.caughtVersionByGame) {
+    state.caughtVersionByGame = {};
+  }
+  if (typeof state.caughtVersionByGame[gameId] !== "number") {
+    state.caughtVersionByGame[gameId] = 0;
+  }
+}
+
+function bumpCaughtVersion(gameId) {
+  if (!gameId) return;
+  ensureCaughtVersionEntry(gameId);
+  state.caughtVersionByGame[gameId] += 1;
+  if (state.normalizedCaughtCache && state.normalizedCaughtCache[gameId]) {
+    delete state.normalizedCaughtCache[gameId];
+  }
+}
+
+function resetCaughtVersions() {
+  state.caughtVersionByGame = {};
+  state.normalizedCaughtCache = {};
+  Object.keys(state.caughtByGame || {}).forEach((gameId) => {
+    state.caughtVersionByGame[gameId] = 0;
+  });
+}
+
 function getCaughtSet(gameId) {
   if (!state.caughtByGame[gameId]) {
     state.caughtByGame[gameId] = new Set();
+    ensureCaughtVersionEntry(gameId);
+  } else {
+    ensureCaughtVersionEntry(gameId);
   }
   return state.caughtByGame[gameId];
+}
+
+function normalizeCatchKeyValue(key) {
+  if (key === undefined || key === null) return "";
+  const value = String(key);
+  const separatorIndex = value.indexOf("|");
+  return separatorIndex >= 0 ? value.slice(separatorIndex + 1) : value;
+}
+
+function getNormalizedCaughtSet(gameId) {
+  if (!gameId || !state.caughtByGame) return null;
+  const set = state.caughtByGame[gameId];
+  if (!(set instanceof Set)) return null;
+  const cacheEntry = state.normalizedCaughtCache?.[gameId];
+  const version = state.caughtVersionByGame?.[gameId] ?? 0;
+  if (cacheEntry && cacheEntry.version === version) {
+    return cacheEntry.set;
+  }
+  const normalized = new Set();
+  set.forEach((value) => normalized.add(normalizeCatchKeyValue(value)));
+  if (!state.normalizedCaughtCache) {
+    state.normalizedCaughtCache = {};
+  }
+  state.normalizedCaughtCache[gameId] = { version, set: normalized };
+  return normalized;
+}
+
+function doesGameContainCatchKey(gameId, catchKey) {
+  if (!gameId || !catchKey) return false;
+  const set = state.caughtByGame?.[gameId];
+  if (!(set instanceof Set)) return false;
+  const normalizedKey = String(catchKey);
+  if (set.has(normalizedKey)) {
+    return true;
+  }
+  const normalizedValue = normalizeCatchKeyValue(normalizedKey);
+  const normalizedSet = getNormalizedCaughtSet(gameId);
+  return normalizedSet ? normalizedSet.has(normalizedValue) : false;
 }
 
 function getCurrentGame() {
@@ -1025,7 +1095,7 @@ function ensureUltimateDexEntries(dex) {
     const entries = Array.isArray(sourceDex.entries) ? sourceDex.entries : [];
     entries.forEach((entry) => {
       if (!entry) return;
-      const key = entry.key || `${entry.speciesId}:${entry.form ?? ""}`;
+      const key = entry.aggregateKey || entry.key || `${entry.speciesId}:${entry.form ?? ""}`;
       if (seenKeys.has(key)) return;
       seenKeys.add(key);
       aggregated.push(entry);
@@ -1156,7 +1226,16 @@ async function buildGenderDexEntries(onProgress) {
   const filtered = baseEntries.filter((entry) =>
     speciesSet.has(String(entry.speciesId))
   );
-  return filtered.map((entry, index) => ({ ...entry, sortIndex: index + 1 }));
+  return filtered.map((entry, index) => {
+    const baseKey = getEntryCatchKey(entry);
+    const genderKey = baseKey ? `${baseKey}|gender` : null;
+    return {
+      ...entry,
+      key: genderKey || entry.key,
+      aggregateKey: genderKey || entry.key || entry.aggregateKey || baseKey || null,
+      sortIndex: index + 1,
+    };
+  });
 }
 
 async function getGenderDifferenceSpeciesSet(onProgress) {
@@ -1847,10 +1926,9 @@ function openEntryDetails(entry) {
 function isCaughtInOtherGames(catchKey, excludeGameId = state.currentGameId) {
   if (!catchKey) return false;
   const key = String(catchKey);
-  return Object.entries(state.caughtByGame).some(([gameId, set]) => {
+  return Object.keys(state.caughtByGame || {}).some((gameId) => {
     if (gameId === excludeGameId) return false;
-    if (!(set instanceof Set)) return false;
-    return set.has(key);
+    return doesGameContainCatchKey(gameId, key);
   });
 }
 
@@ -1860,8 +1938,7 @@ function shouldHighlightHome(catchKey, gameId = state.currentGameId) {
   if (gameId === HOME_GAME_ID) {
     return isCaughtInOtherGames(normalized, gameId);
   }
-  const homeSet = state.caughtByGame?.[HOME_GAME_ID];
-  return homeSet instanceof Set ? homeSet.has(normalized) : false;
+  return doesGameContainCatchKey(HOME_GAME_ID, normalized);
 }
 
 function syncFlagLabelState(label, input) {
@@ -2218,10 +2295,16 @@ function toggleCaught(catchKey) {
   if (!state.currentGameId || !catchKey) return;
   const caughtSet = getCaughtSet(state.currentGameId);
   const normalized = String(catchKey);
+  let changed = false;
   if (caughtSet.has(normalized)) {
     caughtSet.delete(normalized);
+    changed = true;
   } else {
     caughtSet.add(normalized);
+    changed = true;
+  }
+  if (changed) {
+    bumpCaughtVersion(state.currentGameId);
   }
   persistState();
   if (state.caughtFilter === "all") {
@@ -2234,15 +2317,25 @@ function toggleCaught(catchKey) {
 function markEntries(entries, shouldMark) {
   if (!state.currentGameId) return;
   const caughtSet = getCaughtSet(state.currentGameId);
+  let changed = false;
   entries.forEach((entry) => {
     const key = getEntryCatchKey(entry);
     if (!key) return;
     if (shouldMark) {
-      caughtSet.add(String(key));
+      const normalized = String(key);
+      if (!caughtSet.has(normalized)) {
+        caughtSet.add(normalized);
+        changed = true;
+      }
     } else {
-      caughtSet.delete(String(key));
+      if (caughtSet.delete(String(key))) {
+        changed = true;
+      }
     }
   });
+  if (changed) {
+    bumpCaughtVersion(state.currentGameId);
+  }
   persistState();
   renderDex();
 }
@@ -3114,6 +3207,7 @@ function applyImportedPayload(payload) {
       normalizeStoredIds(ids),
     ])
   );
+  resetCaughtVersions();
 
   const nextFlagSets = {};
   FLAG_KEYS.forEach((flag) => {
@@ -3366,6 +3460,7 @@ function loadState() {
         state.caughtByGame = legacy;
       }
     }
+    resetCaughtVersions();
 
     const storedDexSelection = localStorage.getItem(DEX_SELECTION_STORAGE_KEY);
     if (storedDexSelection) {
