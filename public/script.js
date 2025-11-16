@@ -1062,6 +1062,27 @@ function ensureGenderDexEntries(dex) {
   return "loading";
 }
 
+function cloneUltimateEntry(entry, overrides = {}) {
+  if (!entry) return null;
+  return { ...entry, ...overrides };
+}
+
+function annotateGenderedUltimateEntry(entry, gender) {
+  if (!entry || (gender !== "male" && gender !== "female")) {
+    return entry;
+  }
+  const label = gender === "female" ? "Female" : "Male";
+  const baseName = entry.name || "";
+  const suffix = ` (${label})`;
+  const annotatedName = baseName.endsWith(suffix)
+    ? baseName
+    : `${baseName}${baseName ? " " : ""}(${label})`;
+  return cloneUltimateEntry(entry, {
+    name: annotatedName,
+    genderSpritePreference: gender,
+  });
+}
+
 function ensureUltimateDexEntries(dex) {
   if (!dex || dex.id !== ULTIMATE_DEX_ID) {
     return "ready";
@@ -1078,6 +1099,7 @@ function ensureUltimateDexEntries(dex) {
   }
   const seenKeys = new Set();
   const aggregated = [];
+  const genderSpeciesSet = state.genderDex?.speciesSet;
 
   for (const sourceId of sourceDexIds) {
     if (!sourceId) continue;
@@ -1095,10 +1117,23 @@ function ensureUltimateDexEntries(dex) {
     const entries = Array.isArray(sourceDex.entries) ? sourceDex.entries : [];
     entries.forEach((entry) => {
       if (!entry) return;
-      const key = entry.aggregateKey || entry.key || `${entry.speciesId}:${entry.form ?? ""}`;
+      let adapted = entry;
+      if (sourceId === GENDER_DEX_ID) {
+        adapted = annotateGenderedUltimateEntry(entry, "female") || entry;
+      } else if (
+        sourceId === "home" &&
+        genderSpeciesSet?.has?.(String(entry.speciesId))
+      ) {
+        adapted = annotateGenderedUltimateEntry(entry, "male") || entry;
+      } else {
+        adapted = cloneUltimateEntry(entry) || entry;
+      }
+
+      const key =
+        adapted.aggregateKey || adapted.key || `${adapted.speciesId}:${adapted.form ?? ""}`;
       if (seenKeys.has(key)) return;
       seenKeys.add(key);
-      aggregated.push(entry);
+      aggregated.push(adapted);
     });
   }
 
@@ -1627,7 +1662,11 @@ function getSpriteForEntry(entry, details, options = {}) {
   const spriteMode = options.spriteMode || state.spriteMode;
   const catchKey = options.catchKey || getEntryCatchKey(entry);
   const gameId = options.gameId || state.currentGameId;
+  const entryGenderPreference = entry?.genderSpritePreference;
   const genderPreference = (() => {
+    if (entryGenderPreference === "male" || entryGenderPreference === "female") {
+      return entryGenderPreference;
+    }
     if (options.genderMode === "male" || options.genderMode === "female") {
       return options.genderMode;
     }
