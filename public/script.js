@@ -1684,10 +1684,13 @@ function createSpecialFormButton(baseEntry, variant, type) {
   return button;
 }
 
-function appendSpecialForms(container, entry) {
+function appendSpecialForms(container, entry, options = {}) {
+  const { includeSpecial = true } = options;
   if (!container || !entry) return;
   container.innerHTML = "";
-  const forms = getSpecialFormsForSpecies(entry.speciesId);
+  const forms = getSpecialFormsForSpecies(entry.speciesId).filter(
+    (form) => includeSpecial || form.type !== "special"
+  );
   if (!forms.length) {
     container.hidden = true;
     return;
@@ -1706,6 +1709,48 @@ function openVariantDetailsForEntry(baseEntry, variant, type) {
   if (entry) {
     openPokemonDetails(entry);
   }
+}
+
+function isSpecialVariantEntry(entry) {
+  if (!entry || !entry.form) return false;
+  const definition = findVariantDefinition(entry.speciesId, entry.form);
+  return definition?.category === "special";
+}
+
+function findBaseEntryForSpecies(speciesId) {
+  const game = getCurrentGame();
+  if (!game || !Array.isArray(game.dexes)) return null;
+  for (const dex of game.dexes) {
+    const entries = Array.isArray(dex.entries) ? dex.entries : [];
+    const candidate = entries.find(
+      (entry) => entry.speciesId === speciesId && !isSpecialVariantEntry(entry)
+    );
+    if (candidate) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function buildDetailsEntry(entry) {
+  if (!entry) return null;
+  if (!isSpecialVariantEntry(entry)) {
+    return entry;
+  }
+  const baseEntry = findBaseEntryForSpecies(entry.speciesId);
+  if (baseEntry) {
+    return { ...baseEntry };
+  }
+  if (entry.form) {
+    return { ...entry, form: null, key: String(entry.speciesId) };
+  }
+  return entry;
+}
+
+function openEntryDetails(entry) {
+  if (!entry) return;
+  const normalized = buildDetailsEntry(entry) || entry;
+  openPokemonDetails(normalized);
 }
 
 function isCaughtInOtherGames(catchKey, excludeGameId = state.currentGameId) {
@@ -1822,13 +1867,13 @@ function renderGrid(entries, caughtSet) {
       name.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        openPokemonDetails(entry);
+        openEntryDetails(entry);
       });
       name.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           event.stopPropagation();
-          openPokemonDetails(entry);
+          openEntryDetails(entry);
         }
       });
     }
@@ -1850,7 +1895,7 @@ function renderGrid(entries, caughtSet) {
     card.classList.toggle("pokemon-card--compact", isCompact);
 
     renderTypeBadges(typesContainer, entry.types || cachedDetails?.types || []);
-    appendSpecialForms(special, entry);
+    appendSpecialForms(special, entry, { includeSpecial: false });
     renderVersionBadges(versionContainer, entry);
     const hasExclusive = Boolean(entry?.versionExclusive?.length);
     card.classList.toggle("pokemon-card--exclusive", hasExclusive);
@@ -1924,7 +1969,7 @@ function createListRow(entry, caughtSet) {
     nameButton.textContent = entry.name;
     nameButton.addEventListener("click", (event) => {
       event.preventDefault();
-      openPokemonDetails(entry);
+      openEntryDetails(entry);
     });
   }
 
@@ -1932,7 +1977,7 @@ function createListRow(entry, caughtSet) {
   renderTypeBadges(typesCell, entry.types || getCachedPokemonDetails(entry)?.types || []);
 
   const specialContainer = node.querySelector(".pokemon-special");
-  appendSpecialForms(specialContainer, entry);
+  appendSpecialForms(specialContainer, entry, { includeSpecial: false });
   const versionContainer = node.querySelector("[data-version-badges]");
   renderVersionBadges(versionContainer, entry);
 
