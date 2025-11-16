@@ -1,63 +1,66 @@
 # Living Dex Tracker
 
-Een eenvoudige webapplicatie om een Living Dex bij te houden voor meerdere Pokémon-spellen.
+A modern web app for tracking every Pokémon you have caught across the main-series games, Pokémon HOME, and the new Legends ZA entries.
 
-## Functies
+## Features
 
-- Kies het spel waarvoor je de voortgang wilt zien.
-- Wissel tussen regionale Pokédexen, Nationale lijsten, "Other Available Pokémon"-lijsten en nieuwe categorieën zoals "Alternate Forms" en "All Pokémon" per spel (bijv. Paldea, Kitakami, Blueberry, Galar, Isle of Armor, Crown Tundra of de Kanto-varianten van Let's Go). Ook de klassieke releases van Sun/Moon tot en met Gold/Silver/Crystal beschikken nu over hun National Pokédex.
-- Wissel tussen een raster in de stijl van een Pokémon-box, een compacte sprite-boxweergave en een lijstweergave met sorteer- en statusfilters.
-- Bekijk per kaart of lijstregel de typen van de Pokémon dankzij compacte typebadges.
-- Klik op de naam van een Pokémon voor een gedetailleerd overzicht met types, 3D-sprite, vanglocaties (inclusief fallback-locaties voor nieuwere spellen), evoluties en in welke spellen de soort beschikbaar is.
-- Volg je voortgang per Pokédex met een live voortgangsbalk en markeer Pokémon afzonderlijk of in bulk via de “Alles selecteren/Alles wissen”-acties. De voortgang wordt lokaal opgeslagen in de browser.
-- Herken Mega-evoluties en Gigantamax-vormen via speciale iconen en open hun detailkaarten rechtstreeks vanuit de basisvorm.
-- Toon naar wens Shiny-, Mega-, Gigantamax- of nostalgische sprites in de boxweergave en filter in de Pokémon HOME Pokédex op soorten met een Mega- of G-Max-variant.
-- Navigeer sneller tussen boxen of typ direct het gewenste boxnummer in het nieuwe boxveld.
-- Markeer welke Pokémon je hebt gevangen. De voortgang wordt lokaal opgeslagen in de browser.
-- Zoek binnen de geselecteerde Living Dex.
-- Houd ook de complete Pokémon HOME Pokédex bij en kies daarnaast voor de nieuwe Legends ZA Pokédex.
-- Ondersteuning uitgebreid met klassieke spellen van Red/Blue tot en met Ultra Sun & Ultra Moon (inclusief Mega-overzichtsdexen waar relevant).
-- Nummering toont nu het regionale dexnummer gevolgd door het nationale nummer (bijv. `#031 (#079*G)` voor Galarian Slowpoke). Een `*` met regioletter onderscheidt regionale vormen.
-- Regionale vormen gebruiken nu automatisch de bijbehorende PokéAPI `pokemon-form` sprites, zodat Alolan, Galarian, Hisuian en Paldean varianten correct worden weergegeven.
+- Pick any supported game and switch between its regional Pokédexes, specialty lists (such as "Alternate Forms", "Special Forms", or "All Pokémon"), and DLC dexes like Kitakami or Blueberry.
+- Toggle between a full box-style grid, a compact box grid (6×5 to fit on a single screen), or a sortable list view with caught filters.
+- View per-card Pokémon types, version-exclusive badges, Mega/G-Max/alpha/shiny toggles, and highlight Pokémon already caught in other games when browsing the HOME dex.
+- Open a Pokémon's details to see its sprite, types, version exclusives, evolution line (with Mega/G-Max steps), gender differences, special forms, Serebii/Bulbapedia links, and fallback encounter hints.
+- Track caught status, shiny/mega/G-Max/alpha flags, preferred dex per game, and personal notes. Everything is stored locally and survives refreshes.
+- Export or import your full progress (including notes and UI preferences) as JSON for backups or device sync.
+- Theme controls for light/dark mode plus sprite mode toggles (default, shiny, Mega, G-Max, nostalgia) and gender sprite buttons in the HOME gender dex.
+- Netlify-ready static build with `netlify.toml`, so you can deploy the contents of `public/` without a build step.
 
-## Projectstructuur
+## Project structure
 
 ```
 public/
 ├── data/
-│   └── pokemon-data.js   # Lijst met beschikbare spellen en hun Pokédex-varianten
-├── index.html            # Hoofdpagina van de applicatie
-├── script.js             # Logica voor het bijhouden van de Living Dex
-└── styles.css            # Styling voor de webapplicatie
+│   └── pokemon-data.js   # Game + Pokédex definitions and data loaders
+├── index.html            # Main application shell
+├── script.js             # UI logic/state management
+└── styles.css            # Styling/theme definitions
 ```
 
-## Zelf uitbreiden
+## Extending the dex data
 
-Wil je extra spellen of Pokédexen toevoegen? Pas dan `public/data/pokemon-data.js` aan.
-De data wordt dynamisch opgehaald bij de [PokéAPI](https://pokeapi.co/). In het bestand
-vind je een `GAME_CONFIG`-array. Voeg daar je spel aan toe en geef per Pokédex aan welke
-PokéAPI `pokedex`-slug gebruikt moet worden. Als een dex meerdere mogelijke slugs heeft,
-kun je een lijst opgeven; de loader probeert ze op volgorde totdat er een geldige reactie
-komt.
+The data loader relies on [PokéAPI](https://pokeapi.co/) and is configured through the `GAME_CONFIG` array in `public/data/pokemon-data.js`.
 
-### Handige velden in `GAME_CONFIG`
+Useful knobs per Pokédex:
 
-- `speciesOverrides` (per Pokédex): hiermee kun je basissoorten vervangen door een regionale variant (bijv. Galarian Meowth). Gebruik de `form`-sleutel met een bekende vormcode (zoals `galar`, `hisui`, `paldea-combat`) of zet `variantRegionCode` op `A`, `G`, `H`, `P`, … om automatisch de juiste vorm, sprite en vangstsleutel te kiezen.
-- `entryOverrides`: overschrijft individuele dex-entry's (nummer, naam of sprite) op basis van het Pokédex-volgnummer.
-- `manualEntries`: voeg extra entries toe aan een regionale dex met een eigen volgnummer en eventuele vorm. Gebruik optioneel `referenceDexNumber` om de soort van een bestaande Pokédex-entry te hergebruiken of `variantRegionCode` voor automatische variant-keuze.
-- `type: "aggregate"` combineert meerdere eerder gedefinieerde dexen in één lijst (zoals "All Pokémon"). Dubbele soorten worden automatisch gefilterd op basis van hun vangstsleutel.
-- `type: "regional-variants"` genereert automatisch een lijst met alle bekende regionale vormen (handig voor Pokémon HOME).
-- `type: "other-available"`-dexen stellen automatisch een lijst samen op basis van PokéAPI `version-group` data en sluiten eerder gedefinieerde dexen uit. Gebruik `versionGroups` om de relevante versies te benoemen, `excludeDexIds` om overlappende dexen weg te filteren, en `ensureSpecies`, `speciesOverrides` of `manualEntries` voor eventuele event- of vormspecifieke aanvullingen.
-- `type: "manual"` blijft beschikbaar voor volledig handmatige lijsten (bijv. wanneer er geen betrouwbare bron bestaat).
+- `speciesOverrides`: swap base species for a specific form (e.g., Galarian Meowth) via the `form` key or by setting `variantRegionCode` to `A`, `G`, `H`, `P`, etc.
+- `entryOverrides`: override dex numbers, names, or sprites per regional entry number.
+- `manualEntries`: append additional entries with explicit numbering or references to existing dex numbers (handy for event-only Pokémon or alternate forms).
+- `type: "aggregate"`: merge several earlier dexes into one list (duplicates filtered by catch key).
+- `type: "regional-variants"`, `"mega-forms"`, `"gmax-forms"`, or `"special-forms"`: auto-build variant dexes per category.
+- `type: "manual"`: build a Pokédex entirely from explicit `entries`.
 
-Bij het tonen van een Pokémon wordt automatisch het regionale nummer gecombineerd met het nationale nummer, inclusief regioletter voor varianten. Daardoor zie je in één oogopslag welke vorm het betreft en hoe deze in de nationale Pokédex valt.
+Every game automatically receives a "Special Forms" dex that lists any non-regional, non-Mega/G-Max form differences relevant to that game.
 
-> ⚠️  Lokale voortgang uit oudere versies (`living-dex-state-v1`) wordt automatisch gemigreerd naar het nieuwe opslagformaat (`living-dex-state-v2`).
+## Running locally
 
-## Lokaal bekijken
+Serve the `public/` directory with any static server (for example, `python -m http.server`). Then open `http://localhost:8000/public/` in your browser. The app fetches Pokédex data directly from PokéAPI, so keep an internet connection active during the initial load.
 
-Gebruik een eenvoudige HTTP-server (zoals de ingebouwde server van VS Code of `python -m http.server`).
-Navigeer vervolgens in je browser naar `http://localhost:8000/public/` en open `index.html`.
+## Export & import
 
-> ℹ️  De app haalt de volledige lijst van 1.025 Pokémon en alle regionale Pokédexen live op
-> via de PokéAPI. Zorg dus voor een actieve internetverbinding bij het laden van de pagina.
+Use the **Export data** and **Import data** buttons in the control ribbon to back up or restore your progress. The exported JSON includes:
+
+- Caught Pokémon per game
+- Shiny/Mega/G-Max/alpha flags per Pokémon per game
+- Preferred Pokédex per game
+- Notes per game
+- Theme and collapsed-filter preferences
+
+Importing a file immediately applies the data and persists it to `localStorage`.
+
+## Deploying on Netlify
+
+This repository already contains a `netlify.toml` that points Netlify at the `public` directory and redirects all routes to `index.html`.
+
+1. Create a new Netlify site from Git and select this repository.
+2. Leave the build command empty and set the publish directory to `public`.
+3. Deploy—the tracker will be available at your Netlify URL as soon as the upload finishes.
+
+You can also upload the `public/` folder manually via the Netlify UI if you prefer drag-and-drop deployments.

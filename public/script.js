@@ -2,26 +2,134 @@
 const BOX_SIZE = 30;
 const STORAGE_KEY = "living-dex-state-v2";
 const LEGACY_STORAGE_KEYS = ["living-dex-state-v1"];
+const FLAG_STORAGE_KEY = "living-dex-flags-v1";
+const GAME_NOTES_STORAGE_KEY = `${STORAGE_KEY}:game-notes`;
+const THEME_STORAGE_KEY = "living-dex-theme";
+const CONTROLS_COLLAPSE_STORAGE_KEY = "living-dex-controls-collapsed";
+const FLAG_KEYS = ["shiny", "mega", "gmax", "alpha"];
+const FLAG_LABELS = {
+  shiny: "Shiny",
+  mega: "Mega",
+  gmax: "G-Max",
+  alpha: "Alpha",
+};
+const FLAG_ICONS = {
+  shiny: "✧",
+  mega: "M",
+  gmax: "G",
+  alpha: "α",
+};
+const API_BASE_URL = "https://pokeapi.co/api/v2";
+const HOME_GAME_ID = "pokemon-home";
+const HOME_SPECIAL_FORMS_DEX_ID = `${HOME_GAME_ID}-special-forms`;
+const GENDER_DEX_ID = "home-gender";
+const ULTIMATE_DEX_ID = "home-ultimate";
+const GENDER_DIFFERENCE_CACHE_KEY = "gender-difference-species-v1";
+const VERSION_BADGE_STYLES = {
+  scarlet: { label: "Scarlet", color: "#d2483c" },
+  violet: { label: "Violet", color: "#6b4bd6" },
+  sword: { label: "Sword", color: "#2d8fe5" },
+  shield: { label: "Shield", color: "#c54d8c" },
+  "lets-go-pikachu": {
+    label: "LG Pikachu",
+    color: "#f6c445",
+    textColor: "#3a2800",
+  },
+  "lets-go-eevee": {
+    label: "LG Eevee",
+    color: "#c4874a",
+    textColor: "#2b1800",
+  },
+  "brilliant-diamond": { label: "Brilliant Diamond", color: "#4cb3ff" },
+  "shining-pearl": {
+    label: "Shining Pearl",
+    color: "#f3b1d5",
+    textColor: "#4a1031",
+  },
+  diamond: { label: "Diamond", color: "#5dade2" },
+  pearl: { label: "Pearl", color: "#f0b9d0", textColor: "#4e1231" },
+  ruby: { label: "Ruby", color: "#d84315" },
+  sapphire: { label: "Sapphire", color: "#1565c0" },
+  "omega-ruby": { label: "Omega Ruby", color: "#ba2d32" },
+  "alpha-sapphire": { label: "Alpha Sapphire", color: "#1c79c0" },
+  "fire-red": { label: "FireRed", color: "#e53935" },
+  "leaf-green": { label: "LeafGreen", color: "#43a047" },
+  gold: { label: "Gold", color: "#c69320" },
+  silver: { label: "Silver", color: "#a0b2c2", textColor: "#0c1b2a" },
+  heartgold: { label: "HeartGold", color: "#c7902f" },
+  soulsilver: { label: "SoulSilver", color: "#90a4ae", textColor: "#0d1b2a" },
+  red: { label: "Red", color: "#c62828" },
+  blue: { label: "Blue", color: "#1e88e5" },
+  sun: { label: "Sun", color: "#ff8f00" },
+  moon: { label: "Moon", color: "#5c6bc0" },
+  "ultra-sun": { label: "Ultra Sun", color: "#f57c00" },
+  "ultra-moon": { label: "Ultra Moon", color: "#7e57c2" },
+  x: { label: "Pokémon X", color: "#1e88e5" },
+  y: { label: "Pokémon Y", color: "#c62828" },
+  black: { label: "Black", color: "#212121" },
+  white: { label: "White", color: "#f5f5f5", textColor: "#1f1f1f" },
+  "black-2": { label: "Black 2", color: "#424242" },
+  "white-2": { label: "White 2", color: "#ededed", textColor: "#1f1f1f" },
+};
+const GMAX_FLAG_GAMES = new Set(["sword-shield", HOME_GAME_ID]);
+const MEGA_FLAG_GAMES = new Set([
+  "x-y",
+  "sun-moon",
+  "ultra-sun-moon",
+  "omega-ruby-alpha-sapphire",
+  "lets-go",
+  "legends-za",
+  HOME_GAME_ID,
+]);
+const ALPHA_FLAG_GAMES = new Set(["legends-arceus", "legends-za"]);
+
+const DATA_EXPORT_VERSION = 1;
+
+const VIEW_MODES = {
+  GRID: "grid",
+  COMPACT: "compact",
+  LIST: "list",
+};
+
+const THEMES = {
+  LIGHT: "light",
+  DARK: "dark",
+};
 
 const dom = {
+  controls: document.querySelector(".controls"),
+  appHeader: document.querySelector(".app-header"),
+  appMain: document.querySelector(".app-main"),
+  appFooter: document.querySelector(".app-footer"),
   gameSelect: document.getElementById("game-select"),
   dexSelect: document.getElementById("dex-select"),
   searchInput: document.getElementById("search-input"),
+  gameNotes: document.getElementById("game-notes"),
+  controlsCollapsible: document.getElementById("controls-collapsible"),
+  controlsToggle: document.getElementById("controls-collapse"),
+  controlsToggleText: document.getElementById("controls-collapse-text"),
   sortSelect: document.getElementById("sort-select"),
   caughtFilter: document.getElementById("caught-filter"),
   specialFilter: document.getElementById("special-filter"),
   specialFilterControl: document.getElementById("special-filter-control"),
+  themeToggle: document.getElementById("toggle-theme"),
   viewGridToggle: document.getElementById("view-grid"),
   viewCompactToggle: document.getElementById("view-compact"),
   viewListToggle: document.getElementById("view-list"),
   selectAll: document.getElementById("select-all"),
   clearAll: document.getElementById("clear-all"),
+  exportData: document.getElementById("export-data"),
+  importData: document.getElementById("import-data"),
+  importDataInput: document.getElementById("import-data-input"),
   spriteModeActions: document.getElementById("sprite-mode-actions"),
   showDefaultSprites: document.getElementById("show-default-sprites"),
   showShinySprites: document.getElementById("show-shiny-sprites"),
   showMegaSprites: document.getElementById("show-mega-sprites"),
   showGmaxSprites: document.getElementById("show-gmax-sprites"),
   showNostalgiaSprites: document.getElementById("show-nostalgia-sprites"),
+  genderSpriteToggle: document.getElementById("gender-sprite-toggle"),
+  showGenderMale: document.getElementById("show-gender-male"),
+  showGenderFemale: document.getElementById("show-gender-female"),
   dexGrid: document.getElementById("dex-grid"),
   dexList: document.getElementById("dex-list"),
   dexListBody: document.getElementById("dex-list-body"),
@@ -44,9 +152,10 @@ const dom = {
   detailSprite: document.getElementById("pokemon-detail-sprite"),
   detailHeight: document.getElementById("pokemon-detail-height"),
   detailWeight: document.getElementById("pokemon-detail-weight"),
-  detailGames: document.getElementById("pokemon-detail-games"),
-  detailEncounters: document.getElementById("pokemon-detail-encounters"),
+  detailLinks: document.getElementById("pokemon-detail-links"),
+  detailVersions: document.getElementById("pokemon-detail-versions"),
   detailEvolution: document.getElementById("pokemon-detail-evolution"),
+  detailVariants: document.getElementById("pokemon-detail-variants"),
 };
 
 const state = {
@@ -59,14 +168,204 @@ const state = {
   caughtFilter: "all",
   specialFilter: "all",
   spriteMode: "default",
+  genderDexSpriteMode: "male",
+  theme: THEMES.LIGHT,
+  controlsCollapsed: false,
   filters: {
     search: "",
   },
   caughtByGame: {},
+  caughtVersionByGame: {},
+  normalizedCaughtCache: {},
   selectedDexByGame: {},
-  variantsBySpecies: { mega: {}, gmax: {} },
+  gameNotesByGame: {},
+  variantsBySpecies: { mega: {}, gmax: {}, special: {} },
   variantDefinitionMap: new Map(),
+  flagSets: {
+    shiny: {},
+    mega: {},
+    gmax: {},
+    alpha: {},
+  },
+  variantGroupsBySpecies: new Map(),
+  entryCache: new Map(),
+  pokedexData: null,
+  genderDex: {
+    isLoading: false,
+    isLoaded: false,
+    error: null,
+    progress: { processed: 0, total: 0 },
+    speciesSet: null,
+  },
 };
+
+let compactHeightRaf = null;
+
+function applyTheme(theme) {
+  const normalized = theme === THEMES.DARK ? THEMES.DARK : THEMES.LIGHT;
+  state.theme = normalized;
+  if (document.documentElement) {
+    document.documentElement.dataset.theme = normalized;
+  }
+  if (dom.themeToggle) {
+    const isDark = normalized === THEMES.DARK;
+    dom.themeToggle.setAttribute("aria-pressed", String(isDark));
+    dom.themeToggle.classList.toggle("is-active", isDark);
+    dom.themeToggle.textContent = isDark ? "☀️ Light mode" : "🌙 Dark mode";
+  }
+}
+
+function loadThemePreference() {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === THEMES.DARK) {
+      state.theme = THEMES.DARK;
+    }
+  } catch (error) {
+    console.warn("Could not load theme:", error);
+  }
+  applyTheme(state.theme);
+}
+
+function toggleTheme() {
+  const next = state.theme === THEMES.DARK ? THEMES.LIGHT : THEMES.DARK;
+  applyTheme(next);
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, next);
+  } catch (error) {
+    console.warn("Could not save theme:", error);
+  }
+}
+
+function applyControlsCollapsed(collapsed) {
+  const isCollapsed = Boolean(collapsed);
+  state.controlsCollapsed = isCollapsed;
+  dom.controls?.classList.toggle("controls--collapsed", isCollapsed);
+  if (dom.controlsCollapsible) {
+    dom.controlsCollapsible.hidden = isCollapsed;
+  }
+  if (dom.controlsToggle) {
+    dom.controlsToggle.setAttribute("aria-expanded", String(!isCollapsed));
+  }
+  if (dom.controlsToggleText) {
+    dom.controlsToggleText.textContent = isCollapsed
+      ? "Expand filters"
+      : "Collapse filters";
+  }
+  if (state.viewMode === VIEW_MODES.COMPACT) {
+    scheduleCompactViewportMeasurement();
+  }
+}
+
+function loadControlsCollapsePreference() {
+  let collapsed = false;
+  try {
+    collapsed = localStorage.getItem(CONTROLS_COLLAPSE_STORAGE_KEY) === "true";
+  } catch (error) {
+    console.warn("Could not load filter preference:", error);
+  }
+  applyControlsCollapsed(collapsed);
+}
+
+function toggleControlsCollapsed() {
+  const next = !state.controlsCollapsed;
+  applyControlsCollapsed(next);
+  try {
+    localStorage.setItem(CONTROLS_COLLAPSE_STORAGE_KEY, next ? "true" : "false");
+  } catch (error) {
+    console.warn("Could not save filter preference:", error);
+  }
+}
+
+function loadUiPreferences() {
+  loadThemePreference();
+  loadControlsCollapsePreference();
+}
+
+function clearCompactViewportHeight() {
+  if (compactHeightRaf) {
+    cancelAnimationFrame(compactHeightRaf);
+    compactHeightRaf = null;
+  }
+  if (document.documentElement) {
+    document.documentElement.style.removeProperty("--compact-grid-height");
+  }
+}
+
+function measureCompactViewportHeight() {
+  if (state.viewMode !== VIEW_MODES.COMPACT) return;
+  const main = dom.appMain;
+  if (!main) return;
+  const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || 0;
+  const headerHeight = dom.appHeader?.offsetHeight || 0;
+  const footerHeight = dom.appFooter?.offsetHeight || 0;
+  const controlsHeight = dom.controls?.offsetHeight || 0;
+  const mainStyles = window.getComputedStyle(main);
+  const paddingTop = Number.parseFloat(mainStyles.paddingTop) || 0;
+  const paddingBottom = Number.parseFloat(mainStyles.paddingBottom) || 0;
+  const mainGap = Number.parseFloat(mainStyles.rowGap || mainStyles.gap || 0);
+  const availableSpace =
+    viewportHeight -
+    headerHeight -
+    footerHeight -
+    controlsHeight -
+    paddingTop -
+    paddingBottom -
+    mainGap;
+  const fallback = Math.max(viewportHeight * 0.45, 240);
+  const hasRoom = availableSpace > 0;
+  const resolvedHeight = hasRoom ? availableSpace : fallback;
+  if (document.body) {
+    if (hasRoom) {
+      document.body.dataset.compactLock = "true";
+    } else {
+      delete document.body.dataset.compactLock;
+    }
+  }
+  document.documentElement?.style.setProperty(
+    "--compact-grid-height",
+    `${Math.round(resolvedHeight)}px`
+  );
+}
+
+function scheduleCompactViewportMeasurement() {
+  if (state.viewMode !== VIEW_MODES.COMPACT) {
+    document.body?.classList.remove("is-compact-grid");
+    if (document.body?.dataset?.compactLock) {
+      delete document.body.dataset.compactLock;
+    }
+    clearCompactViewportHeight();
+    return;
+  }
+  if (!document.body?.classList.contains("is-compact-grid")) {
+    document.body?.classList.add("is-compact-grid");
+  }
+  if (compactHeightRaf) {
+    cancelAnimationFrame(compactHeightRaf);
+  }
+  compactHeightRaf = requestAnimationFrame(() => {
+    compactHeightRaf = null;
+    measureCompactViewportHeight();
+  });
+}
+
+function handleViewModeChromeChange() {
+  if (state.viewMode === VIEW_MODES.COMPACT) {
+    scheduleCompactViewportMeasurement();
+  } else {
+    document.body?.classList.remove("is-compact-grid");
+    if (document.body?.dataset?.compactLock) {
+      delete document.body.dataset.compactLock;
+    }
+    clearCompactViewportHeight();
+  }
+}
+
+function onWindowResize() {
+  if (state.viewMode === VIEW_MODES.COMPACT) {
+    scheduleCompactViewportMeasurement();
+  }
+}
 
 const TYPE_COLORS = {
   normal: { background: "#A8A77A", color: "#1f1f1f" },
@@ -94,6 +393,27 @@ const VERSION_NAME_OVERRIDES = {
   violet: "Violet",
   sword: "Sword",
   shield: "Shield",
+  red: "Red",
+  blue: "Blue",
+  gold: "Gold",
+  silver: "Silver",
+  crystal: "Crystal",
+  ruby: "Ruby",
+  sapphire: "Sapphire",
+  emerald: "Emerald",
+  "fire-red": "FireRed",
+  "leaf-green": "LeafGreen",
+  diamond: "Diamond",
+  pearl: "Pearl",
+  platinum: "Platinum",
+  heartgold: "HeartGold",
+  soulsilver: "SoulSilver",
+  black: "Black",
+  white: "White",
+  x: "Pokémon X",
+  y: "Pokémon Y",
+  sun: "Sun",
+  moon: "Moon",
   "isle-of-armor": "Isle of Armor",
   "crown-tundra": "Crown Tundra",
   "brilliant-diamond": "Brilliant Diamond",
@@ -111,8 +431,9 @@ const VERSION_NAME_OVERRIDES = {
 };
 
 const SPECIAL_FORM_METADATA = {
-  mega: { symbol: "M", className: "special-icon--mega", label: "Mega evolutie" },
+  mega: { symbol: "M", className: "special-icon--mega", label: "Mega evolution" },
   gmax: { symbol: "G", className: "special-icon--gmax", label: "Gigantamax" },
+  special: { symbol: "S", className: "special-icon--special", label: "Special form" },
 };
 
 const VERSION_RELEASE_ORDER = [
@@ -164,11 +485,60 @@ const VERSION_ORDER_MAP = new Map(
   VERSION_RELEASE_ORDER.map((slug, index) => [slug, index])
 );
 
-const VIEW_MODES = {
-  GRID: "grid",
-  COMPACT: "compact",
-  LIST: "list",
-};
+const VERSION_TO_GAME = new Map([
+  ["red", { gameId: "red-blue-yellow", gameName: "Red, Blue & Yellow" }],
+  ["blue", { gameId: "red-blue-yellow", gameName: "Red, Blue & Yellow" }],
+  ["yellow", { gameId: "red-blue-yellow", gameName: "Red, Blue & Yellow" }],
+  ["gold", { gameId: "gold-silver-crystal", gameName: "Gold, Silver & Crystal" }],
+  ["silver", { gameId: "gold-silver-crystal", gameName: "Gold, Silver & Crystal" }],
+  ["crystal", { gameId: "gold-silver-crystal", gameName: "Gold, Silver & Crystal" }],
+  ["ruby", { gameId: "ruby-sapphire", gameName: "Ruby & Sapphire" }],
+  ["sapphire", { gameId: "ruby-sapphire", gameName: "Ruby & Sapphire" }],
+  ["emerald", { gameId: "emerald", gameName: "Emerald" }],
+  ["fire-red", { gameId: "firered-leafgreen", gameName: "FireRed & LeafGreen" }],
+  ["leaf-green", { gameId: "firered-leafgreen", gameName: "FireRed & LeafGreen" }],
+  ["diamond", { gameId: "diamond-pearl", gameName: "Diamond & Pearl" }],
+  ["pearl", { gameId: "diamond-pearl", gameName: "Diamond & Pearl" }],
+  ["platinum", { gameId: "platinum", gameName: "Platinum" }],
+  ["heartgold", { gameId: "heartgold-soulsilver", gameName: "HeartGold & SoulSilver" }],
+  ["soulsilver", { gameId: "heartgold-soulsilver", gameName: "HeartGold & SoulSilver" }],
+  ["black", { gameId: "black-white", gameName: "Black & White" }],
+  ["white", { gameId: "black-white", gameName: "Black & White" }],
+  ["black-2", { gameId: "black-2-white-2", gameName: "Black 2 & White 2" }],
+  ["white-2", { gameId: "black-2-white-2", gameName: "Black 2 & White 2" }],
+  ["x", { gameId: "x-y", gameName: "X & Y" }],
+  ["y", { gameId: "x-y", gameName: "X & Y" }],
+  ["omega-ruby", { gameId: "omega-ruby-alpha-sapphire", gameName: "Omega Ruby & Alpha Sapphire" }],
+  ["alpha-sapphire", { gameId: "omega-ruby-alpha-sapphire", gameName: "Omega Ruby & Alpha Sapphire" }],
+  ["sun", { gameId: "sun-moon", gameName: "Sun & Moon" }],
+  ["moon", { gameId: "sun-moon", gameName: "Sun & Moon" }],
+  ["ultra-sun", { gameId: "ultra-sun-moon", gameName: "Ultra Sun & Ultra Moon" }],
+  ["ultra-moon", { gameId: "ultra-sun-moon", gameName: "Ultra Sun & Ultra Moon" }],
+  ["lets-go-pikachu", { gameId: "lets-go", gameName: "Let's Go Pikachu & Eevee" }],
+  ["lets-go-eevee", { gameId: "lets-go", gameName: "Let's Go Pikachu & Eevee" }],
+  ["sword", { gameId: "sword-shield", gameName: "Sword & Shield" }],
+  ["shield", { gameId: "sword-shield", gameName: "Sword & Shield" }],
+  ["isle-of-armor", { gameId: "sword-shield", gameName: "Sword & Shield" }],
+  ["crown-tundra", { gameId: "sword-shield", gameName: "Sword & Shield" }],
+  ["brilliant-diamond", { gameId: "brilliant-diamond-pearl", gameName: "Brilliant Diamond & Shining Pearl" }],
+  ["shining-pearl", { gameId: "brilliant-diamond-pearl", gameName: "Brilliant Diamond & Shining Pearl" }],
+  ["legends-arceus", { gameId: "legends-arceus", gameName: "Legends Arceus" }],
+  ["scarlet", { gameId: "scarlet-violet", gameName: "Scarlet & Violet" }],
+  ["violet", { gameId: "scarlet-violet", gameName: "Scarlet & Violet" }],
+  ["teal-mask", { gameId: "scarlet-violet", gameName: "Scarlet & Violet" }],
+  ["indigo-disk", { gameId: "scarlet-violet", gameName: "Scarlet & Violet" }],
+  ["home", { gameId: "pokemon-home", gameName: "Pokémon HOME" }],
+]);
+
+const GAME_RELEASE_ORDER_MAP = new Map();
+VERSION_RELEASE_ORDER.forEach((version, index) => {
+  const group = VERSION_TO_GAME.get(version);
+  if (!group) return;
+  const existing = GAME_RELEASE_ORDER_MAP.get(group.gameId);
+  if (existing === undefined || index < existing) {
+    GAME_RELEASE_ORDER_MAP.set(group.gameId, index);
+  }
+});
 
 const NOSTALGIA_VERSION_BY_DEX = {
   home: "home",
@@ -234,7 +604,7 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       versionName: "Scarlet",
       locations: [
         { name: "South Province (Areas One–Six)", methods: ["Overworld"] },
-        { name: "West & North Province", methods: ["Habitat verkenning"] },
+        { name: "West & North Province", methods: ["Habitat exploration"] },
         { name: "Area Zero", methods: ["Late-game overworld"] },
         { name: "Tera Raid Dens", methods: ["Tera Raids"] },
       ],
@@ -255,8 +625,8 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       versionName: "Teal Mask",
       locations: [
         { name: "Kitakami Road & Mossfell Confluence", methods: ["Overworld"] },
-        { name: "Timeless Woods", methods: ["Nacht spawns & events"] },
-        { name: "Crystal Pool", methods: ["Speciale ontmoetingen"] },
+        { name: "Timeless Woods", methods: ["Night spawns & events"] },
+        { name: "Crystal Pool", methods: ["Special encounters"] },
       ],
     },
   ],
@@ -267,7 +637,7 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       locations: [
         { name: "Savanna & Coastal Biome", methods: ["Blueberry Biome overworld"] },
         { name: "Canyon & Polar Biome", methods: ["Blueberry Biome overworld"] },
-        { name: "BB Quests", methods: ["Blueberry Quests beloningen"] },
+        { name: "BB Quests", methods: ["Blueberry Quests rewards"] },
       ],
     },
   ],
@@ -276,16 +646,16 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       version: "scarlet",
       versionName: "Scarlet",
       locations: [
-        { name: "Tera Raid Dens", methods: ["5★-7★ evenementen"] },
-        { name: "Blueberry Academy", methods: ["BB Quests en legendarische excursies"] },
+        { name: "Tera Raid Dens", methods: ["5★-7★ events"] },
+        { name: "Blueberry Academy", methods: ["BB Quests & legendary excursions"] },
       ],
     },
     {
       version: "violet",
       versionName: "Violet",
       locations: [
-        { name: "Tera Raid Dens", methods: ["5★-7★ evenementen"] },
-        { name: "Blueberry Academy", methods: ["BB Quests en legendarische excursies"] },
+        { name: "Tera Raid Dens", methods: ["5★-7★ events"] },
+        { name: "Blueberry Academy", methods: ["BB Quests & legendary excursions"] },
       ],
     },
   ],
@@ -295,7 +665,7 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       versionName: "Sword",
       locations: [
         { name: "Wild Area", methods: ["Overworld", "Max Raid Battles"] },
-        { name: "Routes & Cities", methods: ["Grasvelden", "Fishing"] },
+        { name: "Routes & Cities", methods: ["Grass encounters", "Fishing"] },
       ],
     },
     {
@@ -303,7 +673,7 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       versionName: "Shield",
       locations: [
         { name: "Wild Area", methods: ["Overworld", "Max Raid Battles"] },
-        { name: "Routes & Cities", methods: ["Grasvelden", "Fishing"] },
+        { name: "Routes & Cities", methods: ["Grass encounters", "Fishing"] },
       ],
     },
   ],
@@ -313,7 +683,7 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       versionName: "Isle of Armor",
       locations: [
         { name: "Fields of Honor & Soothing Wetlands", methods: ["Overworld"] },
-        { name: "Courageous Cavern", methods: ["Grotten"] },
+        { name: "Courageous Cavern", methods: ["Caves"] },
         { name: "Max Raid Dens", methods: ["Dynamax Raids"] },
       ],
     },
@@ -325,7 +695,7 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       locations: [
         { name: "Slippery Slope & Giant's Bed", methods: ["Overworld"] },
         { name: "Max Lair", methods: ["Dynamax Adventures"] },
-        { name: "Crown Shrine", methods: ["Verhaal evenementen"] },
+        { name: "Crown Shrine", methods: ["Story events"] },
       ],
     },
   ],
@@ -341,14 +711,14 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       version: "sword",
       versionName: "Sword",
       locations: [
-        { name: "Mystery Gift", methods: ["Evenementen & transfers"] },
+        { name: "Mystery Gift", methods: ["Events & transfers"] },
       ],
     },
     {
       version: "shield",
       versionName: "Shield",
       locations: [
-        { name: "Mystery Gift", methods: ["Evenementen & transfers"] },
+        { name: "Mystery Gift", methods: ["Events & transfers"] },
       ],
     },
   ],
@@ -357,8 +727,8 @@ const FALLBACK_ENCOUNTERS_BY_DEX = {
       version: "legends-arceus",
       versionName: "Legends Arceus",
       locations: [
-        { name: "Obsidian Fieldlands", methods: ["Verkenning & Mass Outbreaks"] },
-        { name: "Crimson Mirelands", methods: ["Ruimtijdverstoringen"] },
+        { name: "Obsidian Fieldlands", methods: ["Exploration & Mass Outbreaks"] },
+        { name: "Crimson Mirelands", methods: ["Space-time distortions"] },
         { name: "Coronet Highlands / Alabaster Icelands", methods: ["Postgame"] },
       ],
     },
@@ -414,7 +784,7 @@ function formatTypeLabel(type) {
 }
 
 function formatLocationName(name) {
-  if (!name) return "Onbekende locatie";
+  if (!name) return "Unknown location";
   return titleCase(String(name));
 }
 
@@ -439,11 +809,51 @@ function getVersionOrder(version) {
   return Number.MAX_SAFE_INTEGER;
 }
 
+function getGameOrder(gameId) {
+  if (!gameId) return Number.MAX_SAFE_INTEGER;
+  if (GAME_RELEASE_ORDER_MAP.has(gameId)) {
+    return GAME_RELEASE_ORDER_MAP.get(gameId);
+  }
+  return Number.MAX_SAFE_INTEGER;
+}
+
 function buildVariantDefinitionMap(definitions = []) {
   const map = new Map();
   definitions.forEach((variant) => {
     if (!variant || !variant.speciesId || !variant.form) return;
     map.set(`${Number(variant.speciesId)}:${variant.form}`, variant);
+  });
+  return map;
+}
+
+const VARIANT_CATEGORY_ORDER = {
+  regional: 0,
+  mega: 1,
+  gmax: 2,
+  special: 3,
+  gender: 4,
+};
+
+function groupVariantDefinitionsBySpecies(definitions = []) {
+  const map = new Map();
+  definitions.forEach((variant) => {
+    if (!variant || !variant.speciesId || !variant.form) return;
+    const key = String(variant.speciesId);
+    const list = map.get(key) || [];
+    list.push(variant);
+    map.set(key, list);
+  });
+  map.forEach((list) => {
+    list.sort((a, b) => {
+      const orderA = VARIANT_CATEGORY_ORDER[a?.category] ?? 99;
+      const orderB = VARIANT_CATEGORY_ORDER[b?.category] ?? 99;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      const nameA = a?.name || "";
+      const nameB = b?.name || "";
+      return nameA.localeCompare(nameB, "en", { sensitivity: "base" });
+    });
   });
   return map;
 }
@@ -454,11 +864,79 @@ function getGames() {
     : [];
 }
 
+function ensureCaughtVersionEntry(gameId) {
+  if (!gameId) return;
+  if (!state.caughtVersionByGame) {
+    state.caughtVersionByGame = {};
+  }
+  if (typeof state.caughtVersionByGame[gameId] !== "number") {
+    state.caughtVersionByGame[gameId] = 0;
+  }
+}
+
+function bumpCaughtVersion(gameId) {
+  if (!gameId) return;
+  ensureCaughtVersionEntry(gameId);
+  state.caughtVersionByGame[gameId] += 1;
+  if (state.normalizedCaughtCache && state.normalizedCaughtCache[gameId]) {
+    delete state.normalizedCaughtCache[gameId];
+  }
+}
+
+function resetCaughtVersions() {
+  state.caughtVersionByGame = {};
+  state.normalizedCaughtCache = {};
+  Object.keys(state.caughtByGame || {}).forEach((gameId) => {
+    state.caughtVersionByGame[gameId] = 0;
+  });
+}
+
 function getCaughtSet(gameId) {
   if (!state.caughtByGame[gameId]) {
     state.caughtByGame[gameId] = new Set();
+    ensureCaughtVersionEntry(gameId);
+  } else {
+    ensureCaughtVersionEntry(gameId);
   }
   return state.caughtByGame[gameId];
+}
+
+function normalizeCatchKeyValue(key) {
+  if (key === undefined || key === null) return "";
+  const value = String(key);
+  const separatorIndex = value.indexOf("|");
+  return separatorIndex >= 0 ? value.slice(separatorIndex + 1) : value;
+}
+
+function getNormalizedCaughtSet(gameId) {
+  if (!gameId || !state.caughtByGame) return null;
+  const set = state.caughtByGame[gameId];
+  if (!(set instanceof Set)) return null;
+  const cacheEntry = state.normalizedCaughtCache?.[gameId];
+  const version = state.caughtVersionByGame?.[gameId] ?? 0;
+  if (cacheEntry && cacheEntry.version === version) {
+    return cacheEntry.set;
+  }
+  const normalized = new Set();
+  set.forEach((value) => normalized.add(normalizeCatchKeyValue(value)));
+  if (!state.normalizedCaughtCache) {
+    state.normalizedCaughtCache = {};
+  }
+  state.normalizedCaughtCache[gameId] = { version, set: normalized };
+  return normalized;
+}
+
+function doesGameContainCatchKey(gameId, catchKey) {
+  if (!gameId || !catchKey) return false;
+  const set = state.caughtByGame?.[gameId];
+  if (!(set instanceof Set)) return false;
+  const normalizedKey = String(catchKey);
+  if (set.has(normalizedKey)) {
+    return true;
+  }
+  const normalizedValue = normalizeCatchKeyValue(normalizedKey);
+  const normalizedSet = getNormalizedCaughtSet(gameId);
+  return normalizedSet ? normalizedSet.has(normalizedValue) : false;
 }
 
 function getCurrentGame() {
@@ -495,6 +973,386 @@ function setCurrentDex(dexId, shouldPersist = true) {
     if (shouldPersist) {
       persistDexSelection();
     }
+  }
+}
+
+function getHomeGame(source = state.pokedexData || window.POKEDEX_DATA) {
+  if (!source || !Array.isArray(source.games)) return null;
+  return source.games.find((game) => game.id === HOME_GAME_ID) || null;
+}
+
+function injectHomeGenderDex(data) {
+  if (!data || !Array.isArray(data.games)) return;
+  const homeGame = data.games.find((game) => game.id === HOME_GAME_ID);
+  if (!homeGame || !Array.isArray(homeGame.dexes)) return;
+  if (homeGame.dexes.some((dex) => dex.id === GENDER_DEX_ID)) {
+    return;
+  }
+  homeGame.dexes.push({
+    id: GENDER_DEX_ID,
+    name: "Gender differences",
+    entries: [],
+    isGenderDex: true,
+  });
+}
+
+function injectHomeUltimateDex(data) {
+  if (!data || !Array.isArray(data.games)) return;
+  const homeGame = data.games.find((game) => game.id === HOME_GAME_ID);
+  if (!homeGame || !Array.isArray(homeGame.dexes)) return;
+  if (homeGame.dexes.some((dex) => dex.id === ULTIMATE_DEX_ID)) {
+    return;
+  }
+  const availableDexIds = new Set(homeGame.dexes.map((dex) => dex.id));
+  const sourceDexIds = [
+    "home",
+    "home-alternate",
+    HOME_SPECIAL_FORMS_DEX_ID,
+    GENDER_DEX_ID,
+  ].filter((dexId) => availableDexIds.has(dexId) || dexId === GENDER_DEX_ID);
+
+  homeGame.dexes.push({
+    id: ULTIMATE_DEX_ID,
+    name: "Ultimate Pokédex",
+    entries: [],
+    sourceDexIds,
+    versions: [],
+  });
+}
+
+function getHomeNationalDex() {
+  const data = state.pokedexData || window.POKEDEX_DATA;
+  const homeGame = getHomeGame(data);
+  if (!homeGame || !Array.isArray(homeGame.dexes)) return null;
+  return homeGame.dexes.find((dex) => dex.id === "home") || null;
+}
+
+function ensureGenderDexEntries(dex) {
+  if (!dex || dex.id !== GENDER_DEX_ID) {
+    return "ready";
+  }
+  if (Array.isArray(dex.entries) && dex.entries.length) {
+    state.genderDex.isLoaded = true;
+    return "ready";
+  }
+  if (state.genderDex.isLoading) {
+    return "loading";
+  }
+  state.genderDex.isLoading = true;
+  state.genderDex.error = null;
+  const total = (state.pokedexData?.species || window.POKEDEX_DATA?.species || []).length;
+  state.genderDex.progress = { processed: 0, total };
+  const onProgress = (progress) => {
+    state.genderDex.progress = progress;
+    updateGenderDexLoadingMessage();
+  };
+  buildGenderDexEntries(onProgress)
+    .then((entries) => {
+      dex.entries = entries;
+      state.genderDex.isLoaded = true;
+      state.genderDex.isLoading = false;
+      renderDex();
+    })
+    .catch((error) => {
+      state.genderDex.error = error;
+      state.genderDex.isLoading = false;
+      console.error("Could not load the gender dex:", error);
+      renderDex();
+    });
+  return "loading";
+}
+
+function cloneUltimateEntry(entry, overrides = {}) {
+  if (!entry) return null;
+  return { ...entry, ...overrides };
+}
+
+function annotateGenderedUltimateEntry(entry, gender) {
+  if (!entry || (gender !== "male" && gender !== "female")) {
+    return entry;
+  }
+  const label = gender === "female" ? "Female" : "Male";
+  const baseName = entry.name || "";
+  const suffix = ` (${label})`;
+  const annotatedName = baseName.endsWith(suffix)
+    ? baseName
+    : `${baseName}${baseName ? " " : ""}(${label})`;
+  return cloneUltimateEntry(entry, {
+    name: annotatedName,
+    genderSpritePreference: gender,
+  });
+}
+
+function ensureUltimateDexEntries(dex) {
+  if (!dex || dex.id !== ULTIMATE_DEX_ID) {
+    return "ready";
+  }
+  const homeGame = getHomeGame();
+  if (!homeGame || !Array.isArray(homeGame.dexes)) {
+    dex.entries = [];
+    return "ready";
+  }
+  const sourceDexIds = Array.isArray(dex.sourceDexIds) ? dex.sourceDexIds : [];
+  if (!sourceDexIds.length) {
+    dex.entries = [];
+    return "ready";
+  }
+  const seenKeys = new Set();
+  const aggregated = [];
+  const genderSpeciesSet = state.genderDex?.speciesSet;
+
+  for (const sourceId of sourceDexIds) {
+    if (!sourceId) continue;
+    const sourceDex = homeGame.dexes.find((entryDex) => entryDex.id === sourceId);
+    if (!sourceDex) continue;
+    if (sourceId === GENDER_DEX_ID) {
+      const status = ensureGenderDexEntries(sourceDex);
+      if (status === "loading") {
+        return "loading";
+      }
+      if (state.genderDex?.error) {
+        continue;
+      }
+    }
+    const entries = Array.isArray(sourceDex.entries) ? sourceDex.entries : [];
+    entries.forEach((entry) => {
+      if (!entry) return;
+      let adapted = entry;
+      if (sourceId === GENDER_DEX_ID) {
+        adapted = annotateGenderedUltimateEntry(entry, "female") || entry;
+      } else if (
+        sourceId === "home" &&
+        genderSpeciesSet?.has?.(String(entry.speciesId))
+      ) {
+        adapted = annotateGenderedUltimateEntry(entry, "male") || entry;
+      } else {
+        adapted = cloneUltimateEntry(entry) || entry;
+      }
+
+      const key =
+        adapted.aggregateKey || adapted.key || `${adapted.speciesId}:${adapted.form ?? ""}`;
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+      aggregated.push(adapted);
+    });
+  }
+
+  dex.entries = aggregated;
+  return "ready";
+}
+
+function getGenderDexProgressMessage() {
+  const progress = state.genderDex?.progress || { processed: 0, total: 0 };
+  if (!progress.total) {
+    return "Building gender dex…";
+  }
+  const percentage = Math.min(
+    100,
+    Math.round((progress.processed / progress.total) * 100)
+  );
+  return `Building gender dex… (${progress.processed}/${progress.total}, ${percentage}%)`;
+}
+
+function renderGenderDexLoading() {
+  if (dom.dexGrid) {
+    dom.dexGrid.innerHTML = `<p class="loading-message">${getGenderDexProgressMessage()}</p>`;
+  }
+  if (dom.dexListBody) {
+    dom.dexListBody.innerHTML = "";
+  }
+  state.totalBoxes = 1;
+  updateBoxIndicator(0, 1);
+  updateSpecialFilterControl({ mega: false, gmax: false });
+  updateSpriteModeActions({ mega: false, gmax: false });
+  updateDexProgress([], new Set());
+  updateViewToggleButtons();
+  updateBoxControls();
+}
+
+function renderGenderDexError() {
+  if (dom.dexGrid) {
+    dom.dexGrid.innerHTML = `<p class="loading-message">Could not load the gender dex. Please try again.</p>`;
+  }
+  if (dom.dexListBody) {
+    dom.dexListBody.innerHTML = "";
+  }
+  state.totalBoxes = 1;
+  updateBoxIndicator(0, 1);
+  updateSpecialFilterControl({ mega: false, gmax: false });
+  updateSpriteModeActions({ mega: false, gmax: false });
+  updateDexProgress([], new Set());
+  updateViewToggleButtons();
+  updateBoxControls();
+}
+
+function renderUltimateDexLoading() {
+  if (dom.dexGrid) {
+    dom.dexGrid.innerHTML = '<p class="loading-message">Building the Ultimate Pokédex…</p>';
+  }
+  if (dom.dexListBody) {
+    dom.dexListBody.innerHTML = "";
+  }
+  state.totalBoxes = 1;
+  updateBoxIndicator(0, 1);
+  updateSpecialFilterControl({ mega: false, gmax: false });
+  updateSpriteModeActions({ mega: false, gmax: false });
+  updateDexProgress([], new Set());
+  updateViewToggleButtons();
+  updateBoxControls();
+}
+
+function getActiveGenderSpriteMode() {
+  const currentDex = getCurrentDex();
+  if (currentDex?.id === GENDER_DEX_ID) {
+    return state.genderDexSpriteMode || "male";
+  }
+  return null;
+}
+
+function updateGenderSpriteToggleVisibility(currentDex = getCurrentDex()) {
+  if (!dom.genderSpriteToggle) return;
+  const shouldShow = currentDex?.id === GENDER_DEX_ID;
+  dom.genderSpriteToggle.hidden = !shouldShow;
+  if (shouldShow) {
+    updateGenderSpriteToggle();
+  }
+}
+
+function updateGenderSpriteToggle() {
+  const mode = state.genderDexSpriteMode || "male";
+  if (dom.showGenderMale) {
+    const isActive = mode === "male";
+    dom.showGenderMale.classList.toggle("is-active", isActive);
+    dom.showGenderMale.setAttribute("aria-pressed", String(isActive));
+  }
+  if (dom.showGenderFemale) {
+    const isActive = mode === "female";
+    dom.showGenderFemale.classList.toggle("is-active", isActive);
+    dom.showGenderFemale.setAttribute("aria-pressed", String(isActive));
+  }
+}
+
+function setGenderSpriteMode(mode) {
+  if (mode !== "male" && mode !== "female") return;
+  if (state.genderDexSpriteMode === mode) return;
+  state.genderDexSpriteMode = mode;
+  updateGenderSpriteToggle();
+  if (getCurrentDex()?.id === GENDER_DEX_ID) {
+    renderDex();
+  }
+}
+
+function updateGenderDexLoadingMessage() {
+  if (!dom.dexGrid) return;
+  const messageNode = dom.dexGrid.querySelector(".loading-message");
+  if (messageNode) {
+    messageNode.textContent = getGenderDexProgressMessage();
+  }
+}
+
+async function buildGenderDexEntries(onProgress) {
+  const homeDex = getHomeNationalDex();
+  if (!homeDex) return [];
+  const speciesSet = await getGenderDifferenceSpeciesSet(onProgress);
+  if (!speciesSet || !speciesSet.size) {
+    return [];
+  }
+  const baseEntries = Array.isArray(homeDex.entries) ? homeDex.entries : [];
+  const filtered = baseEntries.filter((entry) =>
+    speciesSet.has(String(entry.speciesId))
+  );
+  return filtered.map((entry, index) => {
+    const baseKey = getEntryCatchKey(entry);
+    const genderKey = baseKey ? `${baseKey}|gender` : null;
+    return {
+      ...entry,
+      key: genderKey || entry.key,
+      aggregateKey: genderKey || entry.key || entry.aggregateKey || baseKey || null,
+      sortIndex: index + 1,
+    };
+  });
+}
+
+async function getGenderDifferenceSpeciesSet(onProgress) {
+  if (state.genderDex.speciesSet instanceof Set) {
+    return state.genderDex.speciesSet;
+  }
+  const cached = readGenderDifferenceCache();
+  if (cached && cached.size) {
+    state.genderDex.speciesSet = cached;
+    return cached;
+  }
+  const computed = await loadGenderDifferenceSpeciesSet(onProgress);
+  state.genderDex.speciesSet = computed;
+  return computed;
+}
+
+function readGenderDifferenceCache() {
+  try {
+    const raw = localStorage.getItem(GENDER_DIFFERENCE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return new Set(parsed.map((id) => String(id)));
+  } catch (error) {
+    console.warn("Could not read gender cache:", error);
+    return null;
+  }
+}
+
+function writeGenderDifferenceCache(ids = []) {
+  try {
+    localStorage.setItem(GENDER_DIFFERENCE_CACHE_KEY, JSON.stringify(ids));
+  } catch (error) {
+    console.warn("Could not store gender cache:", error);
+  }
+}
+
+async function loadGenderDifferenceSpeciesSet(onProgress) {
+  const data = state.pokedexData || window.POKEDEX_DATA;
+  const speciesList = Array.isArray(data?.species) ? [...data.species] : [];
+  const total = speciesList.length;
+  const results = [];
+  let processed = 0;
+  let nextIndex = 0;
+  const workerCount = Math.min(8, Math.max(1, total));
+
+  async function worker() {
+    while (nextIndex < speciesList.length) {
+      const entry = speciesList[nextIndex++];
+      const speciesId = entry?.id;
+      let hasDifference = false;
+      if (speciesId) {
+        hasDifference = await fetchSpeciesGenderDifferenceFlag(speciesId);
+        if (hasDifference) {
+          results.push(Number(speciesId));
+        }
+      }
+      processed += 1;
+      if (typeof onProgress === "function") {
+        onProgress({ processed, total });
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, worker));
+  results.sort((a, b) => a - b);
+  writeGenderDifferenceCache(results);
+  return new Set(results.map((id) => String(id)));
+}
+
+async function fetchSpeciesGenderDifferenceFlag(speciesId) {
+  if (!speciesId) return false;
+  try {
+    const response = await fetch(`${API_BASE_URL}/pokemon-species/${speciesId}`);
+    if (!response.ok) {
+      throw new Error(`Status ${response.status}`);
+    }
+    const data = await response.json();
+    return Boolean(data?.has_gender_differences);
+  } catch (error) {
+    console.warn(`Could not load gender info for species :`, error);
+    return false;
   }
 }
 
@@ -558,7 +1416,7 @@ function computeSpecialAvailability(entries = []) {
 function resolveActiveSpecialFilter(availability) {
   const hasMega = Boolean(availability?.mega);
   const hasGmax = Boolean(availability?.gmax);
-  const supportsFilter = state.currentGameId === "pokemon-home" && (hasMega || hasGmax);
+  const supportsFilter = state.currentGameId === HOME_GAME_ID && (hasMega || hasGmax);
   let filter = state.specialFilter;
   if (!supportsFilter) {
     filter = "all";
@@ -607,7 +1465,7 @@ function sortEntries(entries) {
     if (aValue === bValue) {
       return (a.displayNumber || "").localeCompare(
         b.displayNumber || "",
-        "nl",
+        "en",
         { numeric: true, sensitivity: "base" }
       );
     }
@@ -659,7 +1517,7 @@ function ensurePokemonDetails(entry) {
     })
     .catch((error) => {
       pendingDetailRequests.delete(key);
-      console.warn("Kon Pokémondetails niet laden:", error);
+      console.warn("Could not load Pokémon details:", error);
       return null;
     });
 
@@ -690,6 +1548,53 @@ function renderTypeBadges(container, types = []) {
     badge.textContent = type.name || formatTypeLabel(slug);
     container.append(badge);
   });
+}
+
+function formatVersionLabel(version) {
+  if (!version && version !== 0) return "";
+  if (VERSION_NAME_OVERRIDES[version]) {
+    return VERSION_NAME_OVERRIDES[version];
+  }
+  return String(version)
+    .split(/[-_]/)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+function renderVersionBadges(container, entry) {
+  if (!container) return;
+  container.innerHTML = "";
+  const versions = Array.isArray(entry?.versionExclusive)
+    ? entry.versionExclusive
+    : [];
+  if (!versions.length) {
+    container.hidden = true;
+    return;
+  }
+  container.hidden = false;
+  versions.forEach((version) => {
+    const badge = document.createElement("span");
+    badge.className = "pokemon-version-badge";
+    const meta = VERSION_BADGE_STYLES[version] || {};
+    badge.textContent = meta.label || formatVersionLabel(version);
+    if (meta.color) {
+      badge.style.backgroundColor = meta.color;
+      badge.style.borderColor = meta.color;
+      badge.style.color = meta.textColor || "#fff";
+    } else {
+      badge.style.removeProperty("background-color");
+      badge.style.removeProperty("border-color");
+      badge.style.removeProperty("color");
+    }
+    container.append(badge);
+  });
+}
+
+function renderDetailVersionBadges(entry) {
+  if (!dom.detailVersions) return;
+  const container = dom.detailVersions.querySelector("[data-version-badges]");
+  renderVersionBadges(container, entry);
+  dom.detailVersions.hidden = !(entry?.versionExclusive?.length);
 }
 
 function updateEntryTypes(entry, types = []) {
@@ -743,27 +1648,75 @@ function resolveSprite(entry, details, options = {}) {
   return "";
 }
 
-function getSpriteForEntry(entry, details) {
+function buildSpriteOptions(extra = {}) {
+  const options = { ...extra };
+  const genderMode = getActiveGenderSpriteMode();
+  if (genderMode) {
+    options.genderMode = genderMode;
+  }
+  return options;
+}
+
+function getSpriteForEntry(entry, details, options = {}) {
   if (!entry) return "";
-  if (state.spriteMode === "mega" || state.spriteMode === "gmax") {
-    const forms = getSpecialFormsForSpecies(entry.speciesId);
-    const match = forms.find((form) => form.type === state.spriteMode);
-    if (match?.variant) {
-      const variantSprite = getVariantSprite(match.variant);
-      if (variantSprite) {
-        return variantSprite;
-      }
+  const spriteMode = options.spriteMode || state.spriteMode;
+  const catchKey = options.catchKey || getEntryCatchKey(entry);
+  const gameId = options.gameId || state.currentGameId;
+  const entryGenderPreference = entry?.genderSpritePreference;
+  const genderPreference = (() => {
+    if (entryGenderPreference === "male" || entryGenderPreference === "female") {
+      return entryGenderPreference;
+    }
+    if (options.genderMode === "male" || options.genderMode === "female") {
+      return options.genderMode;
+    }
+    return getActiveGenderSpriteMode();
+  })();
+  const preferFemale = genderPreference === "female";
+
+  if (spriteMode === "mega" || spriteMode === "gmax") {
+    const specialSprite = getSpecialFormSprite(entry, spriteMode);
+    if (specialSprite) {
+      return specialSprite;
     }
   }
-  if (state.spriteMode === "shiny") {
+  if (spriteMode === "shiny") {
+    if (preferFemale && details?.sprites?.shinyFemale) {
+      return details.sprites.shinyFemale;
+    }
     if (details?.sprites?.shiny) {
       return details.sprites.shiny;
     }
   }
-  if (state.spriteMode === "nostalgia") {
+  if (spriteMode === "nostalgia") {
     const nostalgic = getNostalgiaSprite(entry, details);
     if (nostalgic) {
       return nostalgic;
+    }
+  }
+  if (catchKey && spriteMode !== "mega" && spriteMode !== "gmax") {
+    const specialFlagType = getActiveSpecialFlagType(catchKey, gameId);
+    if (specialFlagType) {
+      const flaggedSprite = getSpecialFormSprite(entry, specialFlagType);
+      if (flaggedSprite) {
+        return flaggedSprite;
+      }
+    }
+  }
+  if (spriteMode !== "shiny" && catchKey && isFlagActive("shiny", catchKey, gameId)) {
+    if (preferFemale && details?.sprites?.shinyFemale) {
+      return details.sprites.shinyFemale;
+    }
+    if (details?.sprites?.shiny) {
+      return details.sprites.shiny;
+    }
+  }
+  if (preferFemale) {
+    if (details?.sprites?.female) {
+      return details.sprites.female;
+    }
+    if (details?.sprites?.shinyFemale) {
+      return details.sprites.shinyFemale;
     }
   }
   return resolveSprite(entry, details, { preferHome: false, preferEntry: true });
@@ -776,14 +1729,35 @@ function getSpecialFormsForSpecies(speciesId) {
   mega.forEach((variant) => results.push({ type: "mega", variant }));
   const gmax = state.variantsBySpecies?.gmax?.[id] || [];
   gmax.forEach((variant) => results.push({ type: "gmax", variant }));
+  const special = state.variantsBySpecies?.special?.[id] || [];
+  special.forEach((variant) => results.push({ type: "special", variant }));
   return results;
+}
+
+function getSpecialFormSprite(entry, type) {
+  if (!entry || !type) return "";
+  const forms = getSpecialFormsForSpecies(entry.speciesId);
+  const match = forms.find((form) => form.type === type);
+  if (match?.variant) {
+    return getVariantSprite(match.variant);
+  }
+  return "";
 }
 
 function getVariantSprite(variant) {
   if (!variant) return "";
   if (variant.sprite) return variant.sprite;
-  if (variant.pokemonId && typeof window.POKEDEX_DATA?.sprites?.default === "function") {
-    return window.POKEDEX_DATA.sprites.default(variant.pokemonId);
+  const definition = findVariantDefinition(variant.speciesId, variant.form);
+  if (definition?.sprite) {
+    return definition.sprite;
+  }
+  const pokemonId = variant.pokemonId || definition?.pokemonId;
+  if (pokemonId && typeof window.POKEDEX_DATA?.sprites?.default === "function") {
+    try {
+      return window.POKEDEX_DATA.sprites.default(pokemonId);
+    } catch (error) {
+      console.warn("Could not load variant sprite:", pokemonId, error);
+    }
   }
   return "";
 }
@@ -903,13 +1877,14 @@ function buildVariantEntry(baseEntry, variant, type) {
 }
 
 function createSpecialFormButton(baseEntry, variant, type) {
-  const meta = SPECIAL_FORM_METADATA[type] || SPECIAL_FORM_METADATA.mega;
+  const meta = SPECIAL_FORM_METADATA[type] || SPECIAL_FORM_METADATA.special;
   const button = document.createElement("button");
   button.type = "button";
   button.className = `special-icon ${meta.className}`;
   button.textContent = meta.symbol;
   const variantName = variant.name || baseEntry.name;
   button.title = `${meta.label}: ${variantName}`;
+  button.setAttribute("aria-label", button.title);
   button.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -918,10 +1893,13 @@ function createSpecialFormButton(baseEntry, variant, type) {
   return button;
 }
 
-function appendSpecialForms(container, entry) {
+function appendSpecialForms(container, entry, options = {}) {
+  const { includeSpecial = true } = options;
   if (!container || !entry) return;
   container.innerHTML = "";
-  const forms = getSpecialFormsForSpecies(entry.speciesId);
+  const forms = getSpecialFormsForSpecies(entry.speciesId).filter(
+    (form) => includeSpecial || form.type !== "special"
+  );
   if (!forms.length) {
     container.hidden = true;
     return;
@@ -942,11 +1920,144 @@ function openVariantDetailsForEntry(baseEntry, variant, type) {
   }
 }
 
+function isSpecialVariantEntry(entry) {
+  if (!entry || !entry.form) return false;
+  const definition = findVariantDefinition(entry.speciesId, entry.form);
+  return definition?.category === "special";
+}
+
+function findBaseEntryForSpecies(speciesId) {
+  const game = getCurrentGame();
+  if (!game || !Array.isArray(game.dexes)) return null;
+  for (const dex of game.dexes) {
+    const entries = Array.isArray(dex.entries) ? dex.entries : [];
+    const candidate = entries.find(
+      (entry) => entry.speciesId === speciesId && !isSpecialVariantEntry(entry)
+    );
+    if (candidate) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function buildDetailsEntry(entry) {
+  if (!entry) return null;
+  if (!isSpecialVariantEntry(entry)) {
+    return entry;
+  }
+  const baseEntry = findBaseEntryForSpecies(entry.speciesId);
+  if (baseEntry) {
+    return { ...baseEntry };
+  }
+  if (entry.form) {
+    return { ...entry, form: null, key: String(entry.speciesId) };
+  }
+  return entry;
+}
+
+function openEntryDetails(entry) {
+  if (!entry) return;
+  const normalized = buildDetailsEntry(entry) || entry;
+  openPokemonDetails(normalized);
+}
+
+function isCaughtInOtherGames(catchKey, excludeGameId = state.currentGameId) {
+  if (!catchKey) return false;
+  const key = String(catchKey);
+  return Object.keys(state.caughtByGame || {}).some((gameId) => {
+    if (gameId === excludeGameId) return false;
+    return doesGameContainCatchKey(gameId, key);
+  });
+}
+
+function shouldHighlightHome(catchKey, gameId = state.currentGameId) {
+  if (!catchKey) return false;
+  const normalized = String(catchKey);
+  if (gameId === HOME_GAME_ID) {
+    return isCaughtInOtherGames(normalized, gameId);
+  }
+  return doesGameContainCatchKey(HOME_GAME_ID, normalized);
+}
+
+function syncFlagLabelState(label, input) {
+  if (!label || !input) return;
+  const isChecked = Boolean(input.checked);
+  label.classList.toggle("is-active", isChecked);
+  label.dataset.active = String(isChecked);
+}
+
+function renderStatusCheckboxes(container, entry, catchKey) {
+  if (!container) return;
+  container.innerHTML = "";
+  const gameId = state.currentGameId;
+  if (!gameId || !catchKey) {
+    container.hidden = true;
+    return;
+  }
+  const availableFlags = FLAG_KEYS.filter(
+    (flag) => isFlagEnabledForGame(flag, gameId) && supportsFlagForEntry(flag, entry)
+  );
+  if (!availableFlags.length) {
+    container.hidden = true;
+    container.style.removeProperty("--flag-columns");
+    return;
+  }
+  container.hidden = false;
+  const columnCount = Math.max(1, Math.min(availableFlags.length, 3));
+  container.style.setProperty("--flag-columns", String(columnCount));
+  availableFlags.forEach((flag) => {
+    const label = document.createElement("label");
+    label.className = "pokemon-flag";
+    label.dataset.flag = flag;
+    label.title = FLAG_LABELS[flag] || "";
+    label.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.className = "pokemon-flag__input";
+    input.dataset.flag = flag;
+    input.checked = isFlagActive(flag, catchKey, gameId);
+    input.setAttribute(
+      "aria-label",
+      `${FLAG_LABELS[flag]} status for ${entry?.name || "this Pokémon"}`
+    );
+    ["click", "pointerdown", "keydown"].forEach((type) => {
+      input.addEventListener(type, (event) => {
+        event.stopPropagation();
+      });
+    });
+    input.addEventListener("change", (event) => {
+      syncFlagLabelState(label, input);
+      setFlagState(flag, catchKey, event.target.checked, gameId);
+    });
+
+    syncFlagLabelState(label, input);
+
+    const icon = document.createElement("span");
+    icon.className = "pokemon-flag__icon";
+    icon.textContent = FLAG_ICONS[flag] || FLAG_LABELS[flag] || "";
+    icon.setAttribute("aria-hidden", "true");
+
+    const srText = document.createElement("span");
+    srText.className = "pokemon-flag__sr";
+    srText.textContent = FLAG_LABELS[flag];
+
+    label.append(input, icon, srText);
+    container.append(label);
+  });
+}
+
 function renderGrid(entries, caughtSet) {
   if (!dom.dexGrid || !dom.cardTemplate) return;
   dom.dexGrid.replaceChildren();
   const isCompact = state.viewMode === VIEW_MODES.COMPACT;
   dom.dexGrid.classList.toggle("dex-grid--compact", isCompact);
+  if (state.entryCache) {
+    state.entryCache.clear();
+  }
   const fragment = document.createDocumentFragment();
   entries.forEach((entry) => {
     const card = dom.cardTemplate.content.firstElementChild.cloneNode(true);
@@ -955,6 +2066,8 @@ function renderGrid(entries, caughtSet) {
     const name = card.querySelector(".pokemon-name");
     const special = card.querySelector(".pokemon-special");
     const typesContainer = card.querySelector(".pokemon-types");
+    const flagContainer = card.querySelector("[data-flag-container]");
+    const versionContainer = card.querySelector("[data-version-badges]");
 
     if (number) {
       number.textContent = entry.displayNumber || "";
@@ -962,23 +2075,29 @@ function renderGrid(entries, caughtSet) {
 
     if (name) {
       name.textContent = entry.name;
-      name.setAttribute("aria-label", `Toon details voor ${entry.name}`);
+      name.setAttribute("aria-label", `View details for ${entry.name}`);
       name.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        openPokemonDetails(entry);
+        openEntryDetails(entry);
       });
       name.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           event.stopPropagation();
-          openPokemonDetails(entry);
+          openEntryDetails(entry);
         }
       });
     }
 
+    const catchKey = getEntryCatchKey(entry);
+    if (catchKey) {
+      state.entryCache.set(String(catchKey), entry);
+    }
+
     const cachedDetails = getCachedPokemonDetails(entry);
-    const spriteUrl = getSpriteForEntry(entry, cachedDetails);
+    const spriteOptions = buildSpriteOptions({ catchKey });
+    const spriteUrl = getSpriteForEntry(entry, cachedDetails, spriteOptions);
     if (sprite) {
       sprite.src = spriteUrl || "";
       sprite.alt = `${entry.name} sprite`;
@@ -988,25 +2107,35 @@ function renderGrid(entries, caughtSet) {
     card.classList.toggle("pokemon-card--compact", isCompact);
 
     renderTypeBadges(typesContainer, entry.types || cachedDetails?.types || []);
-    appendSpecialForms(special, entry);
+    appendSpecialForms(special, entry, { includeSpecial: false });
+    renderVersionBadges(versionContainer, entry);
+    const hasExclusive = Boolean(entry?.versionExclusive?.length);
+    card.classList.toggle("pokemon-card--exclusive", hasExclusive);
 
-    const catchKey = getEntryCatchKey(entry);
     const isCaught = catchKey ? caughtSet.has(String(catchKey)) : false;
     card.dataset.id = catchKey || "";
     card.dataset.caught = String(isCaught);
+    card.setAttribute("aria-pressed", String(isCaught));
+    card.dataset.homeOwned = String(shouldHighlightHome(catchKey, state.currentGameId));
     const detailKey = getEntryDetailKey(entry);
     if (detailKey) {
       card.dataset.entryKey = detailKey;
     }
     card.dataset.spriteMode = state.spriteMode;
 
+    renderStatusCheckboxes(flagContainer, entry, catchKey);
+
     card.addEventListener("click", () => {
-      toggleCaught(catchKey);
+      if (catchKey) {
+        toggleCaught(catchKey);
+      }
     });
     card.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        toggleCaught(catchKey);
+        if (catchKey) {
+          toggleCaught(catchKey);
+        }
       }
     });
 
@@ -1021,7 +2150,7 @@ function renderGrid(entries, caughtSet) {
           )
         : null;
       const imageNode = cardNode?.querySelector?.(".pokemon-sprite");
-      const nextSprite = getSpriteForEntry(entry, details);
+      const nextSprite = getSpriteForEntry(entry, details, buildSpriteOptions({ catchKey }));
       if (imageNode && nextSprite && imageNode.src !== nextSprite) {
         imageNode.src = nextSprite;
       }
@@ -1030,6 +2159,9 @@ function renderGrid(entries, caughtSet) {
     fragment.append(card);
   });
   dom.dexGrid.append(fragment);
+  if (state.viewMode === VIEW_MODES.COMPACT) {
+    scheduleCompactViewportMeasurement();
+  }
 }
 
 function createListRow(entry, caughtSet) {
@@ -1049,7 +2181,7 @@ function createListRow(entry, caughtSet) {
     nameButton.textContent = entry.name;
     nameButton.addEventListener("click", (event) => {
       event.preventDefault();
-      openPokemonDetails(entry);
+      openEntryDetails(entry);
     });
   }
 
@@ -1057,7 +2189,9 @@ function createListRow(entry, caughtSet) {
   renderTypeBadges(typesCell, entry.types || getCachedPokemonDetails(entry)?.types || []);
 
   const specialContainer = node.querySelector(".pokemon-special");
-  appendSpecialForms(specialContainer, entry);
+  appendSpecialForms(specialContainer, entry, { includeSpecial: false });
+  const versionContainer = node.querySelector("[data-version-badges]");
+  renderVersionBadges(versionContainer, entry);
 
   const statusButton = node.querySelector(".status-toggle");
   if (statusButton) {
@@ -1071,9 +2205,10 @@ function createListRow(entry, caughtSet) {
   node.dataset.caught = String(isCaught);
   if (statusButton) {
     statusButton.textContent = isCaught
-      ? "Verwijder markering"
-      : "Markeer als gevangen";
+      ? "Clear mark"
+      : "Mark as caught";
   }
+  node.dataset.homeOwned = String(shouldHighlightHome(catchKey, state.currentGameId));
 
   const detailKey = getEntryDetailKey(entry);
   if (detailKey) {
@@ -1110,11 +2245,12 @@ function updateListRow(catchKey) {
   const caughtSet = getCaughtSet(state.currentGameId);
   const isCaught = caughtSet.has(String(catchKey));
   row.dataset.caught = String(isCaught);
+  row.dataset.homeOwned = String(shouldHighlightHome(catchKey, state.currentGameId));
   const button = row.querySelector(".status-toggle");
   if (button) {
     button.textContent = isCaught
-      ? "Verwijder markering"
-      : "Markeer als gevangen";
+      ? "Clear mark"
+      : "Mark as caught";
   }
 }
 
@@ -1125,7 +2261,67 @@ function updateCard(catchKey) {
   );
   if (!card) return;
   const caughtSet = getCaughtSet(state.currentGameId);
-  card.dataset.caught = String(caughtSet.has(String(catchKey)));
+  const isCaught = caughtSet.has(String(catchKey));
+  card.dataset.caught = String(isCaught);
+  card.setAttribute("aria-pressed", String(isCaught));
+  card.dataset.homeOwned = String(shouldHighlightHome(catchKey, state.currentGameId));
+}
+
+function updateCardFlags(catchKey, gameId = state.currentGameId) {
+  if (!catchKey || !dom.dexGrid) return;
+  const normalized = String(catchKey);
+  const selector = `.pokemon-card[data-id="${escapeSelector(normalized)}"]`;
+  const card = dom.dexGrid.querySelector(selector);
+  if (!card) return;
+
+  const flagContainer = card.querySelector("[data-flag-container]");
+  if (flagContainer) {
+    const inputs = flagContainer.querySelectorAll(".pokemon-flag__input");
+    inputs.forEach((input) => {
+      const flag = input.dataset.flag;
+      if (!flag) return;
+      input.checked = isFlagActive(flag, normalized, gameId);
+      const label = input.closest(".pokemon-flag");
+      syncFlagLabelState(label, input);
+    });
+  }
+
+  const entry = state.entryCache?.get(normalized);
+  if (!entry) return;
+
+  const imageNode = card.querySelector(".pokemon-sprite");
+  if (!imageNode) return;
+
+  const cachedDetails = getCachedPokemonDetails(entry);
+  const options = buildSpriteOptions({ catchKey: normalized, gameId });
+  const nextSprite = getSpriteForEntry(entry, cachedDetails, options);
+  if (nextSprite && imageNode.src !== nextSprite) {
+    imageNode.src = nextSprite;
+  } else if (!nextSprite && imageNode.src) {
+    imageNode.removeAttribute("src");
+  }
+
+  if (!cachedDetails) {
+    ensurePokemonDetails(entry).then((details) => {
+      const cardNode = dom.dexGrid?.querySelector(selector);
+      if (!cardNode) return;
+      const spriteNode = cardNode.querySelector(".pokemon-sprite");
+      if (!spriteNode) return;
+      const resolvedSprite = getSpriteForEntry(
+        entry,
+        details,
+        buildSpriteOptions({ catchKey: normalized, gameId })
+      );
+      if (resolvedSprite && spriteNode.src !== resolvedSprite) {
+        spriteNode.src = resolvedSprite;
+      }
+    });
+  }
+}
+
+function updateFlagIndicators(catchKey, gameId = state.currentGameId) {
+  if (!catchKey) return;
+  updateCardFlags(catchKey, gameId);
 }
 
 function updateEntryStatus(catchKey) {
@@ -1138,10 +2334,16 @@ function toggleCaught(catchKey) {
   if (!state.currentGameId || !catchKey) return;
   const caughtSet = getCaughtSet(state.currentGameId);
   const normalized = String(catchKey);
+  let changed = false;
   if (caughtSet.has(normalized)) {
     caughtSet.delete(normalized);
+    changed = true;
   } else {
     caughtSet.add(normalized);
+    changed = true;
+  }
+  if (changed) {
+    bumpCaughtVersion(state.currentGameId);
   }
   persistState();
   if (state.caughtFilter === "all") {
@@ -1154,15 +2356,25 @@ function toggleCaught(catchKey) {
 function markEntries(entries, shouldMark) {
   if (!state.currentGameId) return;
   const caughtSet = getCaughtSet(state.currentGameId);
+  let changed = false;
   entries.forEach((entry) => {
     const key = getEntryCatchKey(entry);
     if (!key) return;
     if (shouldMark) {
-      caughtSet.add(String(key));
+      const normalized = String(key);
+      if (!caughtSet.has(normalized)) {
+        caughtSet.add(normalized);
+        changed = true;
+      }
     } else {
-      caughtSet.delete(String(key));
+      if (caughtSet.delete(String(key))) {
+        changed = true;
+      }
     }
   });
+  if (changed) {
+    bumpCaughtVersion(state.currentGameId);
+  }
   persistState();
   renderDex();
 }
@@ -1266,7 +2478,7 @@ function resolveSpriteMode(baseAvailability) {
 function updateSpecialFilterControl(baseAvailability) {
   const hasMega = Boolean(baseAvailability?.mega);
   const hasGmax = Boolean(baseAvailability?.gmax);
-  const shouldShow = state.currentGameId === "pokemon-home" && (hasMega || hasGmax);
+  const shouldShow = state.currentGameId === HOME_GAME_ID && (hasMega || hasGmax);
   if (dom.specialFilterControl) {
     dom.specialFilterControl.hidden = !shouldShow;
   }
@@ -1341,6 +2553,7 @@ function setViewMode(mode) {
   state.viewMode = normalized;
   state.currentBox = 0;
   updateViewToggleButtons();
+  handleViewModeChromeChange();
   renderDex();
 }
 
@@ -1375,96 +2588,140 @@ function jumpToBox(boxNumber) {
   }
 }
 
-function sortEncounterEntries(encounters = []) {
-  return encounters
-    .slice()
-    .sort((a, b) => {
-      const order =
-        getVersionOrder(a.version || a.versionName) -
-        getVersionOrder(b.version || b.versionName);
-      if (order !== 0) return order;
-      const nameA = normalizeVersionSlug(a.version || a.versionName);
-      const nameB = normalizeVersionSlug(b.version || b.versionName);
-      return nameA.localeCompare(nameB);
-    });
+const SEREBII_PATH_BUILDERS = {
+  "generation-i": (id) => `https://www.serebii.net/pokedex/${id}.shtml`,
+  "generation-ii": (id) => `https://www.serebii.net/pokedex-gs/${id}.shtml`,
+  "generation-iii": (id) => `https://www.serebii.net/pokedex-rs/${id}.shtml`,
+  "generation-iv": (id) => `https://www.serebii.net/pokedex-dp/${id}.shtml`,
+  "generation-v": (id) => `https://www.serebii.net/pokedex-bw/${id}.shtml`,
+  "generation-vi": (id) => `https://www.serebii.net/pokedex-xy/${id}.shtml`,
+  "generation-vii": (id) => `https://www.serebii.net/pokedex-sm/${id}.shtml`,
+  "generation-viii": (id, slug) =>
+    `https://www.serebii.net/pokedex-swsh/${slug || id}/`,
+  "generation-ix": (id, slug) => `https://www.serebii.net/pokedex-sv/${slug || id}/`,
+};
+
+function sanitizeSerebiiSlugPart(value) {
+  if (!value) return "";
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
-function renderAvailability(container, availability = []) {
+function buildSerebiiSlug(details, entry) {
+  const slug = details?.speciesSlug || entry?.pokemonSlug || "";
+  const sanitizedSlug = sanitizeSerebiiSlugPart(slug);
+  if (sanitizedSlug) return sanitizedSlug;
+  const fallback = details?.name || entry?.name || "";
+  return sanitizeSerebiiSlugPart(fallback);
+}
+
+function buildSerebiiUrl(details, entry) {
+  const speciesId = details?.speciesId || entry?.speciesId;
+  if (!speciesId) return null;
+  const paddedId = String(speciesId).padStart(3, "0");
+  const generation = details?.generation || null;
+  const slug = buildSerebiiSlug(details, entry);
+  const builder = generation ? SEREBII_PATH_BUILDERS[generation] : null;
+  if (typeof builder === "function") {
+    return builder(paddedId, slug);
+  }
+  return `https://www.serebii.net/pokedex/${paddedId}.shtml`;
+}
+
+function buildBulbapediaUrl(details, entry) {
+  const name = details?.name || entry?.name;
+  if (!name) return null;
+  const page = `${name.replace(/\s+/g, "_")}_(Pokémon)`;
+  return `https://bulbapedia.bulbagarden.net/wiki/${encodeURI(page)}`;
+}
+
+function renderExternalLinks(container, details, entry) {
   if (!container) return;
   container.innerHTML = "";
-  if (!Array.isArray(availability) || !availability.length) {
-    const empty = document.createElement("p");
-    empty.className = "pokemon-details__empty";
-    empty.textContent = "Geen koppelingen met geselecteerde games.";
-    container.append(empty);
+  const links = [];
+  const serebiiUrl = buildSerebiiUrl(details, entry);
+  if (serebiiUrl) {
+    links.push({ label: "Serebii", url: serebiiUrl });
+  }
+  const bulbapediaUrl = buildBulbapediaUrl(details, entry);
+  if (bulbapediaUrl) {
+    links.push({ label: "Bulbapedia", url: bulbapediaUrl });
+  }
+
+  if (!links.length) {
+    container.hidden = true;
     return;
   }
 
-  availability.forEach((entry) => {
-    const wrapper = document.createElement("div");
-    wrapper.className = "pokemon-details__game";
-    const title = document.createElement("p");
-    title.className = "pokemon-details__game-title";
-    title.textContent = entry.gameName;
-    wrapper.append(title);
-
-    const list = document.createElement("ul");
-    list.className = "pokemon-details__dexes";
-    entry.dexes.forEach((dex) => {
-      const item = document.createElement("li");
-      item.textContent = dex.number ? `${dex.name} — ${dex.number}` : dex.name;
-      list.append(item);
-    });
-    wrapper.append(list);
-    container.append(wrapper);
+  container.hidden = false;
+  links.forEach((link) => {
+    const anchor = document.createElement("a");
+    anchor.className = "pokemon-details__link";
+    anchor.href = link.url;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    anchor.textContent = link.label;
+    container.append(anchor);
   });
 }
 
-function renderEncounters(container, encounters = []) {
-  if (!container) return;
-  container.innerHTML = "";
-  const sorted = sortEncounterEntries(encounters);
-  if (!sorted.length) {
-    const empty = document.createElement("p");
-    empty.className = "pokemon-details__empty";
-    empty.textContent = "Geen bekende vanglocaties.";
-    container.append(empty);
-    return;
+function getSpeciesSprite(speciesId) {
+  if (!speciesId || typeof window.POKEDEX_DATA?.sprites?.default !== "function") {
+    return "";
+  }
+  try {
+    return window.POKEDEX_DATA.sprites.default(speciesId) || "";
+  } catch (error) {
+    console.warn("Could not fetch sprite for", speciesId, error);
+    return "";
+  }
+}
+
+function createEvolutionMonNode(data) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "pokemon-details__evolution-mon";
+  if (data?.isCurrent) {
+    wrapper.classList.add("is-current");
   }
 
-  sorted.forEach((entry) => {
-    const details = document.createElement("details");
-    details.className = "pokemon-details__encounter";
+  const spriteUrl = data?.sprite || getSpeciesSprite(data?.id);
+  if (spriteUrl) {
+    const img = document.createElement("img");
+    img.className = "pokemon-details__evolution-sprite";
+    img.src = spriteUrl;
+    img.alt = `${data?.name || "Unknown"} sprite`;
+    img.loading = "lazy";
+    wrapper.append(img);
+  } else {
+    const placeholder = document.createElement("div");
+    placeholder.className = "pokemon-details__evolution-sprite pokemon-details__evolution-sprite--placeholder";
+    wrapper.append(placeholder);
+  }
 
-    const summary = document.createElement("summary");
-    summary.className = "pokemon-details__encounter-title";
-    summary.textContent = entry.versionName || entry.version || "Onbekende versie";
-    details.append(summary);
+  const label = document.createElement("span");
+  label.className = "pokemon-details__evolution-name";
+  label.textContent = data?.name || "Unknown";
+  wrapper.append(label);
 
-    const list = document.createElement("ul");
-    list.className = "pokemon-details__locations";
-    (entry.locations || []).forEach((location) => {
-      const item = document.createElement("li");
-      const methods = (location.methods || []).filter(Boolean).join(" • ");
-      item.textContent = methods
-        ? `${formatLocationName(location.name)} — ${methods}`
-        : formatLocationName(location.name);
-      list.append(item);
-    });
-
-    details.append(list);
-    container.append(details);
-  });
+  return wrapper;
 }
 
 function renderEvolution(container, evolution = {}, entry) {
   if (!container) return;
   container.innerHTML = "";
   const steps = Array.isArray(evolution.steps) ? evolution.steps : [];
-  if (!steps.length) {
+  const specialForms = entry ? getSpecialFormsForSpecies(entry.speciesId) : [];
+  const relevantSpecialForms = specialForms.filter((form) =>
+    form?.type === "mega" || form?.type === "gmax"
+  );
+  if (!steps.length && !relevantSpecialForms.length) {
     const empty = document.createElement("p");
     empty.className = "pokemon-details__empty";
-    empty.textContent = "Geen evolutiegegevens beschikbaar.";
+    empty.textContent = "No evolution data available.";
     container.append(empty);
     return;
   }
@@ -1472,15 +2729,17 @@ function renderEvolution(container, evolution = {}, entry) {
   steps.forEach((step) => {
     const block = document.createElement("div");
     block.className = "pokemon-details__evolution-step";
-    const title = document.createElement("p");
-    title.className = "pokemon-details__encounter-title";
+    const path = document.createElement("div");
+    path.className = "pokemon-details__evolution-path";
 
-    const fromNode = document.createElement(step.from?.isCurrent ? "strong" : "span");
-    fromNode.textContent = step.from?.name || "Onbekend";
-    const toNode = document.createElement(step.to?.isCurrent ? "strong" : "span");
-    toNode.textContent = step.to?.name || "Onbekend";
-    title.append(fromNode, document.createTextNode(" → "), toNode);
-    block.append(title);
+    const fromNode = createEvolutionMonNode(step.from);
+    const arrow = document.createElement("span");
+    arrow.className = "pokemon-details__evolution-arrow";
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.textContent = "→";
+    const toNode = createEvolutionMonNode(step.to);
+    path.append(fromNode, arrow, toNode);
+    block.append(path);
 
     const methods = Array.isArray(step.methods) ? step.methods.filter(Boolean) : [];
     if (methods.length) {
@@ -1496,64 +2755,185 @@ function renderEvolution(container, evolution = {}, entry) {
 
     container.append(block);
   });
+
+  if (relevantSpecialForms.length) {
+    renderSpecialEvolutionForms(container, entry, relevantSpecialForms);
+  }
 }
 
-function buildFallbackEncounters(entry, availability) {
-  if (!availability || !availability.length) return [];
-  const results = [];
-  const seen = new Set();
+function renderSpecialEvolutionForms(container, entry, forms) {
+  if (!container || !entry || !forms.length) return;
+  const baseSprite = entry.sprite || getSpeciesSprite(entry.speciesId);
+  const baseData = {
+    id: entry.speciesId,
+    name: entry.name,
+    sprite: baseSprite,
+    isCurrent: !entry.form,
+  };
+  forms.forEach(({ type, variant }) => {
+    const variantEntry = buildVariantEntry(entry, variant, type);
+    if (!variantEntry) return;
+    const block = document.createElement("div");
+    block.className = "pokemon-details__evolution-step pokemon-details__evolution-step--special";
 
-  availability.forEach((gameEntry) => {
-    (gameEntry.dexes || []).forEach((dex) => {
-      const fallback = FALLBACK_ENCOUNTERS_BY_DEX[dex.id];
-      if (!fallback) return;
-      fallback.forEach((encounter) => {
-        const key = `${dex.id}:${encounter.version}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        results.push(encounter);
-      });
+    const path = document.createElement("div");
+    path.className = "pokemon-details__evolution-path";
+
+    const fromNode = createEvolutionMonNode(baseData);
+    const arrow = document.createElement("span");
+    arrow.className = "pokemon-details__evolution-arrow";
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.textContent = "→";
+    const variantSprite = getVariantSprite(variant) || variantEntry.sprite || null;
+    const toNode = createEvolutionMonNode({
+      id: variantEntry.speciesId,
+      name: variantEntry.name,
+      sprite: variantSprite,
+      isCurrent: Boolean(entry.form && entry.form === variantEntry.form),
     });
+    path.append(fromNode, arrow, toNode);
+    block.append(path);
+
+    const meta = SPECIAL_FORM_METADATA[type] || SPECIAL_FORM_METADATA.special;
+    const list = document.createElement("ul");
+    list.className = "pokemon-details__evolution-methods";
+    const item = document.createElement("li");
+    item.textContent = meta.label;
+    list.append(item);
+    block.append(list);
+
+    container.append(block);
+  });
+}
+
+function getVariantsForEntry(entry, { includeMega = false, includeGmax = false } = {}) {
+  if (!entry || !entry.speciesId) return [];
+  const key = String(entry.speciesId);
+  if (!key) return [];
+  const variants = state.variantGroupsBySpecies.get(key) || [];
+  return variants.filter((variant) => {
+    if (!includeMega && variant?.category === "mega") return false;
+    if (!includeGmax && variant?.category === "gmax") return false;
+    return true;
+  });
+}
+
+function buildGenderVariantEntries(entry, details) {
+  if (!entry || !details?.sprites) return [];
+  const femaleSprite = details.sprites.female || details.sprites.shinyFemale;
+  if (!femaleSprite) return [];
+  const maleSprite =
+    details.sprites.default ||
+    details.sprites.home ||
+    entry.sprite ||
+    getSpeciesSprite(entry.speciesId);
+  const variants = [];
+  if (maleSprite) {
+    variants.push({
+      key: `${entry.speciesId}:gender-male`,
+      speciesId: entry.speciesId,
+      form: entry.form || null,
+      name: `${entry.name} (Male)`,
+      sprite: maleSprite,
+      category: "gender",
+    });
+  }
+  variants.push({
+    key: `${entry.speciesId}:gender-female`,
+    speciesId: entry.speciesId,
+    form: entry.form || null,
+    name: `${entry.name} (Female)`,
+    sprite: femaleSprite,
+    category: "gender",
+  });
+  return variants;
+}
+
+function renderVariants(container, entry, details = null) {
+  if (!container) return;
+  container.innerHTML = "";
+  if (!entry) {
+    const empty = document.createElement("p");
+    empty.className = "pokemon-details__empty";
+    empty.textContent = "No variants available.";
+    container.append(empty);
+    return;
+  }
+  const variants = getVariantsForEntry(entry, { includeMega: true, includeGmax: true });
+  const genderVariants = buildGenderVariantEntries(entry, details);
+  const combined = [...variants, ...genderVariants];
+  if (!combined.length) {
+    const empty = document.createElement("p");
+    empty.className = "pokemon-details__empty";
+    empty.textContent = "No variants available.";
+    container.append(empty);
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "pokemon-variants";
+  combined.forEach((variant) => {
+    const type = variant?.category || "regional";
+    const variantEntry = buildVariantEntry(entry, variant, type);
+    if (!variantEntry) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "pokemon-variant";
+    if (entry.form && variantEntry.form && entry.form === variantEntry.form) {
+      button.classList.add("is-current");
+    }
+    button.title = `View details for ${variantEntry.name}`;
+    button.addEventListener("click", () => {
+      openPokemonDetails(variantEntry);
+    });
+
+    const spriteUrl = variantEntry.sprite || getVariantSprite(variant) || getSpeciesSprite(variantEntry.speciesId);
+    if (spriteUrl) {
+      const img = document.createElement("img");
+      img.className = "pokemon-variant__sprite";
+      img.src = spriteUrl;
+      img.alt = `${variantEntry.name} sprite`;
+      img.loading = "lazy";
+      button.append(img);
+    } else {
+      const placeholder = document.createElement("div");
+      placeholder.className = "pokemon-variant__sprite pokemon-variant__sprite--placeholder";
+      button.append(placeholder);
+    }
+
+    const label = document.createElement("span");
+    label.className = "pokemon-variant__name";
+    label.textContent = variantEntry.name;
+    button.append(label);
+
+    const meta = document.createElement("div");
+    meta.className = "pokemon-variant__meta";
+    if (variantEntry.displayDexNumber) {
+      const number = document.createElement("span");
+      number.textContent = variantEntry.displayDexNumber;
+      meta.append(number);
+    } else if (variantEntry.displayNumber) {
+      const number = document.createElement("span");
+      number.textContent = variantEntry.displayNumber;
+      meta.append(number);
+    }
+    if (variantEntry.regionCode) {
+      const badge = document.createElement("span");
+      badge.className = "pokemon-variant__badge";
+      badge.textContent = variantEntry.regionCode;
+      meta.append(badge);
+    }
+    if (meta.children.length) {
+      button.append(meta);
+    }
+
+    list.append(button);
   });
 
-  return results;
+  container.append(list);
 }
 
-function computeAvailability(entry) {
-  const games = getGames();
-  const key = getEntryDetailKey(entry);
-  if (!key || !games.length) return [];
-
-  return games
-    .map((game) => {
-      const dexes = (game.dexes || []).filter((dex) => {
-        if (!Array.isArray(dex.entries)) return false;
-        if (dex.id && dex.id.endsWith("-all")) return false;
-        return dex.entries.some((dexEntry) => dexEntry.key === key);
-      });
-      if (!dexes.length) return null;
-      return {
-        gameId: game.id,
-        gameName: game.name,
-        dexes: dexes.map((dex) => {
-          const entryMatch = dex.entries.find((dexEntry) => dexEntry.key === key);
-          return {
-            id: dex.id,
-            name: dex.name,
-            number:
-              entryMatch?.displayNumber ||
-              entryMatch?.displayNationalNumber ||
-              entryMatch?.displayDexNumber ||
-              entryMatch?.displayNumber ||
-              "",
-          };
-        }),
-      };
-    })
-    .filter(Boolean);
-}
-
-function showPokemonDetailsLoading(entry, availability) {
+function showPokemonDetailsLoading(entry) {
   if (!entry || !dom.detailsDialog) return;
   if (dom.detailName) dom.detailName.textContent = entry.name;
   if (dom.detailNumber) {
@@ -1575,28 +2955,46 @@ function showPokemonDetailsLoading(entry, availability) {
     dom.detailSprite.alt = `${entry.name} sprite`;
   }
 
-  if (dom.detailHeight) dom.detailHeight.textContent = "Laden…";
-  if (dom.detailWeight) dom.detailWeight.textContent = "Laden…";
-  renderAvailability(dom.detailGames, availability);
+  if (dom.detailHeight) dom.detailHeight.textContent = "Loading…";
+  if (dom.detailWeight) dom.detailWeight.textContent = "Loading…";
 
-  if (dom.detailEncounters) {
-    dom.detailEncounters.innerHTML = "";
-    const loading = document.createElement("p");
-    loading.className = "pokemon-details__empty";
-    loading.textContent = "Gegevens worden geladen…";
-    dom.detailEncounters.append(loading);
+  if (dom.detailLinks) {
+    dom.detailLinks.innerHTML = "";
+    dom.detailLinks.hidden = true;
+  }
+  if (dom.detailVersions) {
+    const badges = dom.detailVersions.querySelector("[data-version-badges]");
+    if (badges) {
+      badges.innerHTML = "";
+    }
+    dom.detailVersions.hidden = true;
+  }
+  if (dom.detailVersions) {
+    const badges = dom.detailVersions.querySelector("[data-version-badges]");
+    if (badges) {
+      badges.innerHTML = "";
+    }
+    dom.detailVersions.hidden = true;
   }
 
-  if (dom.detailEvolution) {
-    dom.detailEvolution.innerHTML = "";
+  if (dom.detailVariants) {
+    dom.detailVariants.innerHTML = "";
     const loading = document.createElement("p");
     loading.className = "pokemon-details__empty";
-    loading.textContent = "Gegevens worden geladen…";
+    loading.textContent = "Loading data…";
     dom.detailEvolution.append(loading);
+  }
+
+  if (dom.detailVariants) {
+    dom.detailVariants.innerHTML = "";
+    const loading = document.createElement("p");
+    loading.className = "pokemon-details__empty";
+    loading.textContent = "Loading data…";
+    dom.detailVariants.append(loading);
   }
 }
 
-function applyPokemonDetails(entry, details, availability) {
+function applyPokemonDetails(entry, details) {
   if (!details) return;
   if (dom.detailName) dom.detailName.textContent = details.name || entry.name;
   if (dom.detailNumber) {
@@ -1607,6 +3005,7 @@ function applyPokemonDetails(entry, details, availability) {
     renderTypeBadges(dom.detailTypes, details.types || entry.types || []);
   }
   updateEntryTypes(entry, details.types || entry.types || []);
+  renderDetailVersionBadges(entry);
   if (dom.detailSprite) {
     const spriteUrl = resolveSprite(entry, details, { preferHome: true });
     if (spriteUrl) {
@@ -1619,23 +3018,15 @@ function applyPokemonDetails(entry, details, availability) {
   if (dom.detailWeight) {
     dom.detailWeight.textContent = formatWeight(details.weight);
   }
-
-  renderAvailability(dom.detailGames, availability);
-  const manualFallback = buildFallbackEncounters(entry, availability);
-  const encounters = details.encounters && details.encounters.length
-    ? details.encounters
-    : manualFallback;
-  renderEncounters(dom.detailEncounters, encounters);
+  renderExternalLinks(dom.detailLinks, details, entry);
   renderEvolution(dom.detailEvolution, details.evolution || {}, entry);
+  renderVariants(dom.detailVariants, entry, details);
 }
 
 function showPokemonDetailsError(message) {
-  if (dom.detailEncounters) {
-    dom.detailEncounters.innerHTML = "";
-    const error = document.createElement("p");
-    error.className = "pokemon-details__empty";
-    error.textContent = message;
-    dom.detailEncounters.append(error);
+  if (dom.detailLinks) {
+    dom.detailLinks.innerHTML = "";
+    dom.detailLinks.hidden = true;
   }
   if (dom.detailEvolution) {
     dom.detailEvolution.innerHTML = "";
@@ -1644,32 +3035,38 @@ function showPokemonDetailsError(message) {
     error.textContent = message;
     dom.detailEvolution.append(error);
   }
+  if (dom.detailVariants) {
+    dom.detailVariants.innerHTML = "";
+    const error = document.createElement("p");
+    error.className = "pokemon-details__empty";
+    error.textContent = message;
+    dom.detailVariants.append(error);
+  }
 }
 
 async function openPokemonDetails(entry) {
   if (!entry || !dom.detailsDialog) return;
   lastFocusedElement =
     document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  const availability = computeAvailability(entry);
-  showPokemonDetailsLoading(entry, availability);
+  showPokemonDetailsLoading(entry);
   if (!dom.detailsDialog.open) {
     dom.detailsDialog.showModal();
   }
 
   const cached = getCachedPokemonDetails(entry);
   if (cached) {
-    applyPokemonDetails(entry, cached, availability);
+    applyPokemonDetails(entry, cached);
   }
 
   try {
     const details = await ensurePokemonDetails(entry);
     if (!details) {
-      showPokemonDetailsError("Kon details niet laden.");
+      showPokemonDetailsError("Unable to load details.");
       return;
     }
-    applyPokemonDetails(entry, details, availability);
+    applyPokemonDetails(entry, details);
   } catch (error) {
-    showPokemonDetailsError("Kon details niet laden.");
+    showPokemonDetailsError("Unable to load details.");
   }
 }
 
@@ -1699,7 +3096,7 @@ function setupDetailsDialog() {
 function formatHeight(decimeters) {
   if (!Number.isFinite(decimeters)) return "-";
   const meters = decimeters / 10;
-  return `${meters.toLocaleString("nl-NL", {
+  return `${meters.toLocaleString("en-US", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   })} m`;
@@ -1708,7 +3105,7 @@ function formatHeight(decimeters) {
 function formatWeight(hectograms) {
   if (!Number.isFinite(hectograms)) return "-";
   const kilograms = hectograms / 10;
-  return `${kilograms.toLocaleString("nl-NL", {
+  return `${kilograms.toLocaleString("en-US", {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   })} kg`;
@@ -1727,6 +3124,340 @@ function normalizeStoredIds(ids) {
   );
 }
 
+function getGameNotes(gameId = state.currentGameId) {
+  if (!gameId) return "";
+  const note = state.gameNotesByGame?.[gameId];
+  return typeof note === "string" ? note : "";
+}
+
+function getSerializableGameNotes() {
+  return Object.fromEntries(
+    Object.entries(state.gameNotesByGame || {}).filter(
+      ([, note]) => typeof note === "string" && note.length
+    )
+  );
+}
+
+function persistGameNotes() {
+  try {
+    const notes = getSerializableGameNotes();
+    if (!Object.keys(notes).length) {
+      localStorage.removeItem(GAME_NOTES_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(GAME_NOTES_STORAGE_KEY, JSON.stringify(notes));
+  } catch (error) {
+    console.warn("Could not save game notes:", error);
+  }
+}
+
+function serializeIdSet(idSet) {
+  if (idSet && typeof idSet.values === "function") {
+    return Array.from(idSet.values());
+  }
+  if (Array.isArray(idSet)) {
+    return idSet.map((value) => String(value));
+  }
+  return [];
+}
+
+function serializeCaughtState() {
+  return Object.fromEntries(
+    Object.entries(state.caughtByGame || {}).map(([gameId, idSet]) => [
+      gameId,
+      serializeIdSet(idSet),
+    ])
+  );
+}
+
+function serializeFlagState() {
+  return FLAG_KEYS.reduce((result, flag) => {
+    const perGame = state.flagSets?.[flag] || {};
+    result[flag] = Object.fromEntries(
+      Object.entries(perGame).map(([gameId, idSet]) => [
+        gameId,
+        serializeIdSet(idSet),
+      ])
+    );
+    return result;
+  }, {});
+}
+
+function getSerializableDexSelection() {
+  return Object.fromEntries(
+    Object.entries(state.selectedDexByGame || {}).filter(
+      ([, dexId]) => typeof dexId === "string" && dexId.length
+    )
+  );
+}
+
+function buildExportPayload() {
+  return {
+    version: DATA_EXPORT_VERSION,
+    exportedAt: new Date().toISOString(),
+    data: {
+      caughtByGame: serializeCaughtState(),
+      flagSets: serializeFlagState(),
+      selectedDexByGame: getSerializableDexSelection(),
+      gameNotesByGame: getSerializableGameNotes(),
+      currentGameId: state.currentGameId,
+      currentDexId: state.currentDexId,
+      theme: state.theme,
+      controlsCollapsed: state.controlsCollapsed,
+    },
+  };
+}
+
+function triggerDownload(filename, contents) {
+  const blob = new Blob([contents], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  const target = document.body || document.documentElement || document.createElement("div");
+  target.append(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function exportTrackerData() {
+  try {
+    const payload = buildExportPayload();
+    const timestamp = new Date().toISOString().replace(/[:T]/g, "-").split(".")[0];
+    triggerDownload(`living-dex-export-${timestamp}.json`, JSON.stringify(payload, null, 2));
+  } catch (error) {
+    console.error("Could not export data:", error);
+    alert("Export failed. Please try again.");
+  }
+}
+
+function applyImportedPayload(payload) {
+  const data = payload?.data || payload?.storage || payload;
+  if (!data || typeof data !== "object") {
+    throw new Error("Ongeldig bestand");
+  }
+
+  const progressSource =
+    data.caughtByGame || data.progress || data.pokemon || data.caught || {};
+  state.caughtByGame = Object.fromEntries(
+    Object.entries(progressSource).map(([gameId, ids]) => [
+      gameId,
+      normalizeStoredIds(ids),
+    ])
+  );
+  resetCaughtVersions();
+
+  const nextFlagSets = {};
+  FLAG_KEYS.forEach((flag) => {
+    const source = data.flagSets?.[flag] || data.flags?.[flag] || {};
+    nextFlagSets[flag] = Object.fromEntries(
+      Object.entries(source).map(([gameId, ids]) => [
+        gameId,
+        normalizeStoredIds(ids),
+      ])
+    );
+  });
+  state.flagSets = nextFlagSets;
+
+  const dexSelectionSource = data.selectedDexByGame || data.dexSelection || {};
+  state.selectedDexByGame = Object.fromEntries(
+    Object.entries(dexSelectionSource).filter(
+      ([, dexId]) => typeof dexId === "string" && dexId.length
+    )
+  );
+
+  const notesSource = data.gameNotesByGame || data.notes || {};
+  state.gameNotesByGame = Object.fromEntries(
+    Object.entries(notesSource)
+      .map(([gameId, note]) => [
+        gameId,
+        typeof note === "string" ? note.replace(/\r\n/g, "\n") : "",
+      ])
+      .filter(([, note]) => note.length)
+  );
+
+  const importedTheme = data.theme;
+  if (importedTheme === THEMES.DARK || importedTheme === THEMES.LIGHT) {
+    applyTheme(importedTheme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, importedTheme);
+    } catch (error) {
+      console.warn("Could not save theme:", error);
+    }
+  }
+
+  if (typeof data.controlsCollapsed === "boolean") {
+    applyControlsCollapsed(data.controlsCollapsed);
+    try {
+      localStorage.setItem(
+        CONTROLS_COLLAPSE_STORAGE_KEY,
+        data.controlsCollapsed ? "true" : "false"
+      );
+    } catch (error) {
+      console.warn("Could not save filter preference:", error);
+    }
+  }
+
+  persistState();
+  persistDexSelection();
+  persistGameNotes();
+
+  const importedGameId = data.currentGameId;
+  const importedDexId = data.currentDexId;
+
+  if (typeof importedGameId === "string" && dom.gameSelect) {
+    const games = getGames();
+    if (games.some((game) => game.id === importedGameId)) {
+      state.currentGameId = importedGameId;
+      dom.gameSelect.value = importedGameId;
+      try {
+        localStorage.setItem(`${STORAGE_KEY}:current-game`, importedGameId);
+      } catch (error) {
+        console.warn("Could not save current game:", error);
+      }
+      populateDexSelect();
+    }
+  }
+
+  if (typeof importedDexId === "string" && dom.dexSelect) {
+    const currentGame = getCurrentGame();
+    const dexes = getDexesForGame(currentGame);
+    if (dexes.some((dex) => dex.id === importedDexId)) {
+      dom.dexSelect.value = importedDexId;
+      setCurrentDex(importedDexId);
+    }
+  }
+
+  updateGameNotesInput();
+  renderDex();
+}
+
+function handleImportFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.addEventListener("error", () => {
+    console.error("Could not read file:", reader.error);
+    alert("Import failed. Check the file and try again.");
+  });
+  reader.addEventListener("load", () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      applyImportedPayload(parsed);
+      alert("Data imported successfully!");
+    } catch (error) {
+      console.error("Could not import data:", error);
+      alert("Import failed. Check the file and try again.");
+    }
+  });
+  reader.readAsText(file);
+}
+
+function onImportInputChange(event) {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement)) return;
+  const [file] = input.files || [];
+  if (file) {
+    handleImportFile(file);
+  }
+  input.value = "";
+}
+
+function setGameNotes(value, gameId = state.currentGameId) {
+  if (!gameId || typeof value !== "string") return;
+  const normalized = value.replace(/\r\n/g, "\n");
+  if (!normalized.trim()) {
+    if (state.gameNotesByGame[gameId]) {
+      delete state.gameNotesByGame[gameId];
+      persistGameNotes();
+    }
+    return;
+  }
+  if (state.gameNotesByGame[gameId] === normalized) return;
+  state.gameNotesByGame[gameId] = normalized;
+  persistGameNotes();
+}
+
+function updateGameNotesInput() {
+  if (!dom.gameNotes) return;
+  const hasGame = Boolean(state.currentGameId);
+  dom.gameNotes.disabled = !hasGame;
+  if (!hasGame) {
+    if (dom.gameNotes.value) {
+      dom.gameNotes.value = "";
+    }
+    return;
+  }
+  const value = getGameNotes();
+  if (dom.gameNotes.value !== value) {
+    dom.gameNotes.value = value;
+  }
+}
+
+function ensureFlagContainer(flag) {
+  if (!state.flagSets[flag]) {
+    state.flagSets[flag] = {};
+  }
+}
+
+function getFlagSet(flag, gameId = state.currentGameId) {
+  if (!FLAG_KEYS.includes(flag) || !gameId) {
+    return new Set();
+  }
+  ensureFlagContainer(flag);
+  if (!state.flagSets[flag][gameId]) {
+    state.flagSets[flag][gameId] = new Set();
+  }
+  return state.flagSets[flag][gameId];
+}
+
+function isFlagEnabledForGame(flag, gameId = state.currentGameId) {
+  if (!FLAG_KEYS.includes(flag) || !gameId) return false;
+  if (flag === "shiny") return true;
+  if (flag === "gmax") return GMAX_FLAG_GAMES.has(gameId);
+  if (flag === "mega") return MEGA_FLAG_GAMES.has(gameId);
+  if (flag === "alpha") return ALPHA_FLAG_GAMES.has(gameId);
+  return false;
+}
+
+function supportsFlagForEntry(flag, entry) {
+  if (!entry) return false;
+  if (flag === "mega") {
+    return getSpecialFormsForSpecies(entry.speciesId).some((form) => form.type === "mega");
+  }
+  if (flag === "gmax") {
+    return getSpecialFormsForSpecies(entry.speciesId).some((form) => form.type === "gmax");
+  }
+  return true;
+}
+
+function isFlagActive(flag, catchKey, gameId = state.currentGameId) {
+  if (!FLAG_KEYS.includes(flag) || !catchKey || !gameId) return false;
+  const set = getFlagSet(flag, gameId);
+  return set.has(String(catchKey));
+}
+
+function getActiveSpecialFlagType(catchKey, gameId = state.currentGameId) {
+  if (!catchKey || !gameId) return null;
+  if (isFlagActive("gmax", catchKey, gameId)) return "gmax";
+  if (isFlagActive("mega", catchKey, gameId)) return "mega";
+  return null;
+}
+
+function setFlagState(flag, catchKey, enabled, gameId = state.currentGameId) {
+  if (!FLAG_KEYS.includes(flag) || !catchKey || !gameId) return;
+  if (!isFlagEnabledForGame(flag, gameId)) return;
+  const set = getFlagSet(flag, gameId);
+  const key = String(catchKey);
+  if (enabled) {
+    set.add(key);
+  } else {
+    set.delete(key);
+  }
+  persistState();
+  updateFlagIndicators(key, gameId);
+}
+
 function loadLegacyState() {
   for (const key of LEGACY_STORAGE_KEYS) {
     try {
@@ -1741,7 +3472,7 @@ function loadLegacyState() {
         ])
       );
     } catch (error) {
-      console.warn("Kon legacy voortgang niet laden:", error);
+      console.warn("Could not load legacy progress:", error);
     }
   }
   return null;
@@ -1768,6 +3499,7 @@ function loadState() {
         state.caughtByGame = legacy;
       }
     }
+    resetCaughtVersions();
 
     const storedDexSelection = localStorage.getItem(DEX_SELECTION_STORAGE_KEY);
     if (storedDexSelection) {
@@ -1779,32 +3511,103 @@ function loadState() {
           );
         }
       } catch (error) {
-        console.warn("Kon dex selectie niet laden:", error);
+        console.warn("Could not load dex selection:", error);
+      }
+    }
+
+    const storedFlags = localStorage.getItem(FLAG_STORAGE_KEY);
+    if (storedFlags) {
+      try {
+        const parsedFlags = JSON.parse(storedFlags);
+        if (parsedFlags && typeof parsedFlags === "object") {
+          FLAG_KEYS.forEach((flag) => {
+            const perGame = parsedFlags[flag];
+            if (perGame && typeof perGame === "object") {
+              state.flagSets[flag] = Object.fromEntries(
+                Object.entries(perGame).map(([gameId, ids]) => [
+                  gameId,
+                  normalizeStoredIds(ids),
+                ])
+              );
+            }
+          });
+        }
+      } catch (error) {
+        console.warn("Could not load flag state:", error);
+      }
+    }
+
+    const storedNotes = localStorage.getItem(GAME_NOTES_STORAGE_KEY);
+    if (storedNotes) {
+      try {
+        const parsedNotes = JSON.parse(storedNotes);
+        if (parsedNotes && typeof parsedNotes === "object") {
+          state.gameNotesByGame = Object.fromEntries(
+            Object.entries(parsedNotes)
+              .map(([gameId, note]) => [gameId, typeof note === "string" ? note : ""])
+              .filter(([, note]) => note.length)
+          );
+        }
+      } catch (error) {
+        console.warn("Could not load game notes:", error);
+      }
+    }
+
+    const storedFlags = localStorage.getItem(FLAG_STORAGE_KEY);
+    if (storedFlags) {
+      try {
+        const parsedFlags = JSON.parse(storedFlags);
+        if (parsedFlags && typeof parsedFlags === "object") {
+          FLAG_KEYS.forEach((flag) => {
+            const perGame = parsedFlags[flag];
+            if (perGame && typeof perGame === "object") {
+              state.flagSets[flag] = Object.fromEntries(
+                Object.entries(perGame).map(([gameId, ids]) => [
+                  gameId,
+                  normalizeStoredIds(ids),
+                ])
+              );
+            }
+          });
+        }
+      } catch (error) {
+        console.warn("Kon vlagstatus niet laden:", error);
+      }
+    }
+
+    const storedNotes = localStorage.getItem(GAME_NOTES_STORAGE_KEY);
+    if (storedNotes) {
+      try {
+        const parsedNotes = JSON.parse(storedNotes);
+        if (parsedNotes && typeof parsedNotes === "object") {
+          state.gameNotesByGame = Object.fromEntries(
+            Object.entries(parsedNotes)
+              .map(([gameId, note]) => [gameId, typeof note === "string" ? note : ""])
+              .filter(([, note]) => note.length)
+          );
+        }
+      } catch (error) {
+        console.warn("Kon spelnotities niet laden:", error);
       }
     }
   } catch (error) {
-    console.warn("Kon lokale data niet laden:", error);
+    console.warn("Could not load local data:", error);
   }
 }
 
 function persistState() {
   try {
-    const serializable = Object.fromEntries(
-      Object.entries(state.caughtByGame).map(([gameId, idSet]) => [
-        gameId,
-        Array.from(idSet.values()),
-      ])
-    );
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeCaughtState()));
+    localStorage.setItem(FLAG_STORAGE_KEY, JSON.stringify(serializeFlagState()));
     LEGACY_STORAGE_KEYS.forEach((key) => {
       try {
         localStorage.removeItem(key);
       } catch (error) {
-        console.warn("Kon legacy opslag niet verwijderen:", error);
+        console.warn("Could not clear legacy storage:", error);
       }
     });
   } catch (error) {
-    console.warn("Kon voortgang niet opslaan:", error);
+    console.warn("Could not save progress:", error);
   }
 }
 
@@ -1812,10 +3615,10 @@ function persistDexSelection() {
   try {
     localStorage.setItem(
       DEX_SELECTION_STORAGE_KEY,
-      JSON.stringify(state.selectedDexByGame)
+      JSON.stringify(getSerializableDexSelection())
     );
   } catch (error) {
-    console.warn("Kon dex selectie niet opslaan:", error);
+    console.warn("Could not save dex selection:", error);
   }
 }
 
@@ -1839,6 +3642,7 @@ function populateGameSelect() {
       dom.gameSelect.value = defaultGame;
       state.currentGameId = defaultGame;
     }
+    updateGameNotesInput();
   }
 }
 
@@ -1905,9 +3709,10 @@ function updateDexProgress(entries = [], caughtSet = new Set()) {
     if (dom.dexProgressBar) {
       dom.dexProgressBar.value = 0;
       dom.dexProgressBar.max = 0;
+      dom.dexProgressBar.classList.remove("is-complete");
     }
     if (dom.dexProgressText) {
-      dom.dexProgressText.textContent = "0 / 0 gevangen";
+      dom.dexProgressText.textContent = "0 / 0 caught";
     }
     return;
   }
@@ -1922,26 +3727,28 @@ function updateDexProgress(entries = [], caughtSet = new Set()) {
   });
 
   dom.dexProgress.hidden = false;
+  const percentage = total ? Math.round((caught / total) * 100) : 0;
   if (dom.dexProgressText) {
-    dom.dexProgressText.textContent = `${caught} / ${total} gevangen`;
+    dom.dexProgressText.textContent = `${caught} / ${total} caught (${percentage}%)`;
   }
   if (dom.dexProgressBar) {
     dom.dexProgressBar.max = total;
     dom.dexProgressBar.value = caught;
-    const percentage = total ? Math.round((caught / total) * 100) : 0;
     dom.dexProgressBar.textContent = `${percentage}%`;
+    dom.dexProgressBar.classList.toggle("is-complete", percentage === 100);
   }
 }
 
 function renderDex() {
   const currentGame = getCurrentGame();
   if (!currentGame) {
-    if (dom.dexGrid) dom.dexGrid.innerHTML = "<p>Geen spel geselecteerd.</p>";
+    if (dom.dexGrid) dom.dexGrid.innerHTML = "<p>No game selected.</p>";
     if (dom.dexListBody) dom.dexListBody.innerHTML = "";
     state.totalBoxes = 1;
     updateBoxIndicator(0, 1);
     updateSpecialFilterControl({ mega: false, gmax: false });
     updateSpriteModeActions({ mega: false, gmax: false });
+    updateGenderSpriteToggleVisibility(null);
     updateDexProgress([], new Set());
     updateViewToggleButtons();
     updateBoxControls();
@@ -1950,17 +3757,40 @@ function renderDex() {
 
   const currentDex = getCurrentDex();
   if (!currentDex) {
-    if (dom.dexGrid) dom.dexGrid.innerHTML = "<p>Geen Pokédex beschikbaar.</p>";
+    if (dom.dexGrid) dom.dexGrid.innerHTML = "<p>No Pokédex available.</p>";
     if (dom.dexListBody) dom.dexListBody.innerHTML = "";
     if (dom.emptyDialog?.open) dom.emptyDialog.close();
     state.totalBoxes = 1;
     updateBoxIndicator(0, 1);
     updateSpecialFilterControl({ mega: false, gmax: false });
     updateSpriteModeActions({ mega: false, gmax: false });
+    updateGenderSpriteToggleVisibility(null);
     updateDexProgress([], new Set());
     updateViewToggleButtons();
     updateBoxControls();
     return;
+  }
+
+  updateGenderSpriteToggleVisibility(currentDex);
+
+  if (currentDex.id === GENDER_DEX_ID) {
+    const status = ensureGenderDexEntries(currentDex);
+    if (status === "loading") {
+      renderGenderDexLoading();
+      return;
+    }
+    if (state.genderDex?.error) {
+      renderGenderDexError();
+      return;
+    }
+  }
+
+  if (currentDex.id === ULTIMATE_DEX_ID) {
+    const status = ensureUltimateDexEntries(currentDex);
+    if (status === "loading") {
+      renderUltimateDexLoading();
+      return;
+    }
   }
 
   const context = getFilterContext();
@@ -2001,6 +3831,9 @@ function renderDex() {
     updateBoxIndicator(state.currentBox, totalBoxes);
   } else {
     state.totalBoxes = 1;
+    if (state.entryCache) {
+      state.entryCache.clear();
+    }
     renderList(ordered, context.caughtSet);
     if (dom.dexGrid) dom.dexGrid.innerHTML = "";
     updateBoxIndicator(0, 1);
@@ -2014,6 +3847,7 @@ function onGameChange(event) {
   state.currentGameId = event.target.value;
   state.currentBox = 0;
   localStorage.setItem(`${STORAGE_KEY}:current-game`, state.currentGameId);
+  updateGameNotesInput();
   populateDexSelect();
   renderDex();
 }
@@ -2028,6 +3862,10 @@ function onSearchInput(event) {
   state.filters.search = event.target.value.toLowerCase();
   state.currentBox = 0;
   renderDex();
+}
+
+function onGameNotesInput(event) {
+  setGameNotes(event.target.value);
 }
 
 function onSortChange(event) {
@@ -2083,7 +3921,7 @@ function setupDialog() {
 
 async function init() {
   if (dom.dexGrid) {
-    dom.dexGrid.innerHTML = '<p class="loading-message">Pokédexgegevens laden…</p>';
+    dom.dexGrid.innerHTML = '<p class="loading-message">Loading Pokédex data…</p>';
   }
 
   let data;
@@ -2092,24 +3930,30 @@ async function init() {
     if (!data || !Array.isArray(data.games) || !data.games.length) {
       if (dom.dexGrid) {
         dom.dexGrid.innerHTML =
-          "<p>Geen Pokédex data beschikbaar. Controleer je internetverbinding.</p>";
+          "<p>No Pokédex data available. Check your internet connection.</p>";
       }
       return;
     }
   } catch (error) {
-    console.error("Kon Pokédex data niet laden:", error);
+    console.error("Could not load Pokédex data:", error);
     if (dom.dexGrid) {
       dom.dexGrid.innerHTML =
-        "<p>Kon Pokédex data niet laden. Controleer je internetverbinding en probeer opnieuw.</p>";
+        "<p>Could not load Pokédex data. Check your internet connection and try again.</p>";
     }
     return;
   }
 
+  injectHomeGenderDex(data);
+  injectHomeUltimateDex(data);
+  state.pokedexData = data;
+
   state.variantsBySpecies = {
     mega: data?.variants?.mega || {},
     gmax: data?.variants?.gmax || {},
+    special: data?.variants?.special || {},
   };
   state.variantDefinitionMap = buildVariantDefinitionMap(data?.variants?.all || []);
+  state.variantGroupsBySpecies = groupVariantDefinitionsBySpecies(data?.variants?.all || []);
 
   loadState();
   populateGameSelect();
@@ -2124,14 +3968,32 @@ async function init() {
     dom.dexSelect.addEventListener("change", onDexChange);
   }
   dom.searchInput?.addEventListener("input", onSearchInput);
+  dom.gameNotes?.addEventListener("input", onGameNotesInput);
   dom.sortSelect?.addEventListener("change", onSortChange);
   dom.caughtFilter?.addEventListener("change", onCaughtFilterChange);
   dom.specialFilter?.addEventListener("change", onSpecialFilterChange);
+  dom.themeToggle?.addEventListener("click", (event) => {
+    event.preventDefault();
+    toggleTheme();
+  });
+  dom.controlsToggle?.addEventListener("click", (event) => {
+    event.preventDefault();
+    toggleControlsCollapsed();
+  });
   dom.viewGridToggle?.addEventListener("click", () => setViewMode(VIEW_MODES.GRID));
   dom.viewCompactToggle?.addEventListener("click", () => setViewMode(VIEW_MODES.COMPACT));
   dom.viewListToggle?.addEventListener("click", () => setViewMode(VIEW_MODES.LIST));
   dom.selectAll?.addEventListener("click", selectAllVisible);
   dom.clearAll?.addEventListener("click", clearAllVisible);
+  dom.exportData?.addEventListener("click", (event) => {
+    event.preventDefault();
+    exportTrackerData();
+  });
+  dom.importData?.addEventListener("click", (event) => {
+    event.preventDefault();
+    dom.importDataInput?.click();
+  });
+  dom.importDataInput?.addEventListener("change", onImportInputChange);
   dom.previousBox?.addEventListener("click", () => changeBox(-1));
   dom.nextBox?.addEventListener("click", () => changeBox(1));
   dom.boxInput?.addEventListener("change", onBoxInputChange);
@@ -2141,9 +4003,14 @@ async function init() {
   dom.showMegaSprites?.addEventListener("click", () => setSpriteMode("mega"));
   dom.showGmaxSprites?.addEventListener("click", () => setSpriteMode("gmax"));
   dom.showNostalgiaSprites?.addEventListener("click", () => setSpriteMode("nostalgia"));
+  dom.showGenderMale?.addEventListener("click", () => setGenderSpriteMode("male"));
+  dom.showGenderFemale?.addEventListener("click", () => setGenderSpriteMode("female"));
+  window.addEventListener("resize", onWindowResize);
 
   renderDex();
 }
+
+loadUiPreferences();
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
