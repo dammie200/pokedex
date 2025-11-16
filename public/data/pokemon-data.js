@@ -3728,6 +3728,7 @@ async function loadPokedexData() {
       : null,
   }));
   const speciesById = new Map(species.map((entry) => [entry.id, entry]));
+  speciesSlugLookup = createSpeciesSlugMap(species);
 
   const games = [];
   for (const game of GAME_CONFIG) {

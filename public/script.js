@@ -2977,8 +2977,8 @@ function showPokemonDetailsLoading(entry) {
     dom.detailVersions.hidden = true;
   }
 
-  if (dom.detailEvolution) {
-    dom.detailEvolution.innerHTML = "";
+  if (dom.detailVariants) {
+    dom.detailVariants.innerHTML = "";
     const loading = document.createElement("p");
     loading.className = "pokemon-details__empty";
     loading.textContent = "Loading data…";
@@ -3550,6 +3550,44 @@ function loadState() {
         }
       } catch (error) {
         console.warn("Could not load game notes:", error);
+      }
+    }
+
+    const storedFlags = localStorage.getItem(FLAG_STORAGE_KEY);
+    if (storedFlags) {
+      try {
+        const parsedFlags = JSON.parse(storedFlags);
+        if (parsedFlags && typeof parsedFlags === "object") {
+          FLAG_KEYS.forEach((flag) => {
+            const perGame = parsedFlags[flag];
+            if (perGame && typeof perGame === "object") {
+              state.flagSets[flag] = Object.fromEntries(
+                Object.entries(perGame).map(([gameId, ids]) => [
+                  gameId,
+                  normalizeStoredIds(ids),
+                ])
+              );
+            }
+          });
+        }
+      } catch (error) {
+        console.warn("Kon vlagstatus niet laden:", error);
+      }
+    }
+
+    const storedNotes = localStorage.getItem(GAME_NOTES_STORAGE_KEY);
+    if (storedNotes) {
+      try {
+        const parsedNotes = JSON.parse(storedNotes);
+        if (parsedNotes && typeof parsedNotes === "object") {
+          state.gameNotesByGame = Object.fromEntries(
+            Object.entries(parsedNotes)
+              .map(([gameId, note]) => [gameId, typeof note === "string" ? note : ""])
+              .filter(([, note]) => note.length)
+          );
+        }
+      } catch (error) {
+        console.warn("Kon spelnotities niet laden:", error);
       }
     }
   } catch (error) {
