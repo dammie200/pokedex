@@ -20,7 +20,10 @@ const FLAG_ICONS = {
   alpha: "α",
 };
 const API_BASE_URL = "https://pokeapi.co/api/v2";
+const HOME_GAME_ID = "pokemon-home";
+const HOME_SPECIAL_FORMS_DEX_ID = `${HOME_GAME_ID}-special-forms`;
 const GENDER_DEX_ID = "home-gender";
+const ULTIMATE_DEX_ID = "home-ultimate";
 const GENDER_DIFFERENCE_CACHE_KEY = "gender-difference-species-v1";
 const VERSION_BADGE_STYLES = {
   scarlet: { label: "Scarlet", color: "#d2483c" },
@@ -68,7 +71,7 @@ const VERSION_BADGE_STYLES = {
   "black-2": { label: "Black 2", color: "#424242" },
   "white-2": { label: "White 2", color: "#ededed", textColor: "#1f1f1f" },
 };
-const GMAX_FLAG_GAMES = new Set(["sword-shield", "pokemon-home"]);
+const GMAX_FLAG_GAMES = new Set(["sword-shield", HOME_GAME_ID]);
 const MEGA_FLAG_GAMES = new Set([
   "x-y",
   "sun-moon",
@@ -76,7 +79,7 @@ const MEGA_FLAG_GAMES = new Set([
   "omega-ruby-alpha-sapphire",
   "lets-go",
   "legends-za",
-  "pokemon-home",
+  HOME_GAME_ID,
 ]);
 const ALPHA_FLAG_GAMES = new Set(["legends-arceus", "legends-za"]);
 
@@ -903,9 +906,14 @@ function setCurrentDex(dexId, shouldPersist = true) {
   }
 }
 
+function getHomeGame(source = state.pokedexData || window.POKEDEX_DATA) {
+  if (!source || !Array.isArray(source.games)) return null;
+  return source.games.find((game) => game.id === HOME_GAME_ID) || null;
+}
+
 function injectHomeGenderDex(data) {
   if (!data || !Array.isArray(data.games)) return;
-  const homeGame = data.games.find((game) => game.id === "pokemon-home");
+  const homeGame = data.games.find((game) => game.id === HOME_GAME_ID);
   if (!homeGame || !Array.isArray(homeGame.dexes)) return;
   if (homeGame.dexes.some((dex) => dex.id === GENDER_DEX_ID)) {
     return;
@@ -918,10 +926,33 @@ function injectHomeGenderDex(data) {
   });
 }
 
+function injectHomeUltimateDex(data) {
+  if (!data || !Array.isArray(data.games)) return;
+  const homeGame = data.games.find((game) => game.id === HOME_GAME_ID);
+  if (!homeGame || !Array.isArray(homeGame.dexes)) return;
+  if (homeGame.dexes.some((dex) => dex.id === ULTIMATE_DEX_ID)) {
+    return;
+  }
+  const availableDexIds = new Set(homeGame.dexes.map((dex) => dex.id));
+  const sourceDexIds = [
+    "home",
+    "home-alternate",
+    HOME_SPECIAL_FORMS_DEX_ID,
+    GENDER_DEX_ID,
+  ].filter((dexId) => availableDexIds.has(dexId) || dexId === GENDER_DEX_ID);
+
+  homeGame.dexes.push({
+    id: ULTIMATE_DEX_ID,
+    name: "Ultimate Pokédex",
+    entries: [],
+    sourceDexIds,
+    versions: [],
+  });
+}
+
 function getHomeNationalDex() {
   const data = state.pokedexData || window.POKEDEX_DATA;
-  if (!data || !Array.isArray(data.games)) return null;
-  const homeGame = data.games.find((game) => game.id === "pokemon-home");
+  const homeGame = getHomeGame(data);
   if (!homeGame || !Array.isArray(homeGame.dexes)) return null;
   return homeGame.dexes.find((dex) => dex.id === "home") || null;
 }
@@ -961,6 +992,50 @@ function ensureGenderDexEntries(dex) {
   return "loading";
 }
 
+function ensureUltimateDexEntries(dex) {
+  if (!dex || dex.id !== ULTIMATE_DEX_ID) {
+    return "ready";
+  }
+  const homeGame = getHomeGame();
+  if (!homeGame || !Array.isArray(homeGame.dexes)) {
+    dex.entries = [];
+    return "ready";
+  }
+  const sourceDexIds = Array.isArray(dex.sourceDexIds) ? dex.sourceDexIds : [];
+  if (!sourceDexIds.length) {
+    dex.entries = [];
+    return "ready";
+  }
+  const seenKeys = new Set();
+  const aggregated = [];
+
+  for (const sourceId of sourceDexIds) {
+    if (!sourceId) continue;
+    const sourceDex = homeGame.dexes.find((entryDex) => entryDex.id === sourceId);
+    if (!sourceDex) continue;
+    if (sourceId === GENDER_DEX_ID) {
+      const status = ensureGenderDexEntries(sourceDex);
+      if (status === "loading") {
+        return "loading";
+      }
+      if (state.genderDex?.error) {
+        continue;
+      }
+    }
+    const entries = Array.isArray(sourceDex.entries) ? sourceDex.entries : [];
+    entries.forEach((entry) => {
+      if (!entry) return;
+      const key = entry.key || `${entry.speciesId}:${entry.form ?? ""}`;
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+      aggregated.push(entry);
+    });
+  }
+
+  dex.entries = aggregated;
+  return "ready";
+}
+
 function getGenderDexProgressMessage() {
   const progress = state.genderDex?.progress || { processed: 0, total: 0 };
   if (!progress.total) {
@@ -992,6 +1067,22 @@ function renderGenderDexLoading() {
 function renderGenderDexError() {
   if (dom.dexGrid) {
     dom.dexGrid.innerHTML = `<p class="loading-message">Could not load the gender dex. Please try again.</p>`;
+  }
+  if (dom.dexListBody) {
+    dom.dexListBody.innerHTML = "";
+  }
+  state.totalBoxes = 1;
+  updateBoxIndicator(0, 1);
+  updateSpecialFilterControl({ mega: false, gmax: false });
+  updateSpriteModeActions({ mega: false, gmax: false });
+  updateDexProgress([], new Set());
+  updateViewToggleButtons();
+  updateBoxControls();
+}
+
+function renderUltimateDexLoading() {
+  if (dom.dexGrid) {
+    dom.dexGrid.innerHTML = '<p class="loading-message">Building the Ultimate Pokédex…</p>';
   }
   if (dom.dexListBody) {
     dom.dexListBody.innerHTML = "";
@@ -1211,7 +1302,7 @@ function computeSpecialAvailability(entries = []) {
 function resolveActiveSpecialFilter(availability) {
   const hasMega = Boolean(availability?.mega);
   const hasGmax = Boolean(availability?.gmax);
-  const supportsFilter = state.currentGameId === "pokemon-home" && (hasMega || hasGmax);
+  const supportsFilter = state.currentGameId === HOME_GAME_ID && (hasMega || hasGmax);
   let filter = state.specialFilter;
   if (!supportsFilter) {
     filter = "all";
@@ -1764,8 +1855,13 @@ function isCaughtInOtherGames(catchKey, excludeGameId = state.currentGameId) {
 }
 
 function shouldHighlightHome(catchKey, gameId = state.currentGameId) {
-  if (gameId !== "pokemon-home") return false;
-  return isCaughtInOtherGames(catchKey, gameId);
+  if (!catchKey) return false;
+  const normalized = String(catchKey);
+  if (gameId === HOME_GAME_ID) {
+    return isCaughtInOtherGames(normalized, gameId);
+  }
+  const homeSet = state.caughtByGame?.[HOME_GAME_ID];
+  return homeSet instanceof Set ? homeSet.has(normalized) : false;
 }
 
 function syncFlagLabelState(label, input) {
@@ -2250,7 +2346,7 @@ function resolveSpriteMode(baseAvailability) {
 function updateSpecialFilterControl(baseAvailability) {
   const hasMega = Boolean(baseAvailability?.mega);
   const hasGmax = Boolean(baseAvailability?.gmax);
-  const shouldShow = state.currentGameId === "pokemon-home" && (hasMega || hasGmax);
+  const shouldShow = state.currentGameId === HOME_GAME_ID && (hasMega || hasGmax);
   if (dom.specialFilterControl) {
     dom.specialFilterControl.hidden = !shouldShow;
   }
@@ -3517,6 +3613,14 @@ function renderDex() {
     }
   }
 
+  if (currentDex.id === ULTIMATE_DEX_ID) {
+    const status = ensureUltimateDexEntries(currentDex);
+    if (status === "loading") {
+      renderUltimateDexLoading();
+      return;
+    }
+  }
+
   const context = getFilterContext();
   resolveSpriteMode(context.baseAvailability);
   updateSpecialFilterControl(context.baseAvailability);
@@ -3668,6 +3772,7 @@ async function init() {
   }
 
   injectHomeGenderDex(data);
+  injectHomeUltimateDex(data);
   state.pokedexData = data;
 
   state.variantsBySpecies = {

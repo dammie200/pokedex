@@ -266,7 +266,7 @@ const GMAX_FORMS = [
 ];
 
 const SPECIAL_FORM_CACHE_KEY = "pokedex-special-forms-v1";
-const SPECIAL_FORM_CACHE_VERSION = 3;
+const SPECIAL_FORM_CACHE_VERSION = 4;
 const SPECIAL_FORM_FETCH_LIMIT = 2000;
 const SPECIAL_FORM_SKIP_PATTERNS = [
   /-mega(?![a-z])/, 
@@ -278,8 +278,9 @@ const SPECIAL_FORM_SKIP_PATTERNS = [
   /-totem/, 
   /^genesect-/, 
   /^arceus-/, 
-  /^mothim-/, 
-  /^scatterbug-/, 
+  /^mothim-/,
+  /^spewpa-/,
+  /^scatterbug-/,
   /^silvally-/, 
   /^cramorant-/, 
   /^koraidon-/, 
@@ -301,6 +302,7 @@ const SPECIAL_FORM_EXCLUDE_SLUGS = new Set([
   "oinkologne-f",
   "oinkologne-female",
   "palafin-hero",
+  "zygarde-10",
 ]);
 
 const CAP_PIKACHU_GAMES = [
@@ -1001,7 +1003,7 @@ const GAME_CONFIG = [
         name: "All Pokémon",
         source: {
           type: "aggregate",
-          dexIds: ["lumiose-city", "lumiose-alpha", "lumiose-regional", "lumiose-mega"],
+          dexIds: ["lumiose-city", "lumiose-alpha", "lumiose-regional"],
         },
       },
     ],
